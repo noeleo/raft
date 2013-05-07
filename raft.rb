@@ -24,7 +24,7 @@ module Raft
   end
 
   # TODO: is <= right to update an empty key in a table? does it overwrite or result in error?
-  
+
   bootstrap do
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
@@ -69,7 +69,7 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    server_state <=  server_state do |s|
+    server_state <=  (server_state * votes_granted_in_current_term) do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
   end
