@@ -28,7 +28,7 @@ module Raft
   bootstrap do
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
-    members <= [['localhost:12345'], ['localhost:12346'], ['localhost:12347']]
+    members <= [['localhost:54321'], ['localhost:54322'], ['localhost:54323']]
     # TODO: is this going to work to remove yourself? need it to happen now, not later
     members <- [[ip_port]]
     server_state <= [['follower']]
@@ -40,7 +40,7 @@ module Raft
   bloom :timeout do
     # TODO: change timer so that we can just reset it, not name it every time
     # increment current term
-    current_term <= (timer.alarm * current_term) {|a,t| [t.term + 1]}
+    current_term <= (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
     server_state <= timer.alarm {|t| [['candidate']]}
     # vote for yourself
@@ -86,7 +86,7 @@ module Raft
     request_vote_term_max <= request_vote.argmax([:term], :term) do |rv|
       [rv.term]
     end
-    current_term <= (request_vote_term_max * current_term) do |reqmax, ct|
+    current_term <= (request_vote_term_max * current_term).pairs do |reqmax, ct|
       reqmax if ct < reqmax.term
     end
   end
