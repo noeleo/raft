@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'bud'
+require 'progress_timer'
 
 module Raft
   import ProgressTimer => :timer
