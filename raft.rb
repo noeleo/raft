@@ -19,6 +19,11 @@ module Raft
     table :current_term, [] => [:term]
     # keep record of all votes
     table :votes, [:term, :from] => [:is_granted]
+
+    table :all_votes_for_given_term, [:term, :from] => [:vote] # redunency?
+
+    #table :votes, [:term, :from] => [:is_granted]
+
     scratch :votes_granted_in_current_term, [:from]
 
     scratch :request_vote_term_max, current_term.schema
