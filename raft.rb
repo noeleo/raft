@@ -10,7 +10,7 @@ module Raft
     # TODO: do we need from field in responses?
     channel :request_vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
     channel :request_vote_response, [:@dest, :from, :term, :is_granted]
-    channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :entries, :commit_index]
+    channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :request_entry, :commit_index]
     channel :append_entries_response, [:@dest, :from, :term, :is_success]
 
     # all of the members in the system, host is respective ip_port
