@@ -55,7 +55,7 @@ module Raft
     # TODO: do this correctly
     timer.set_alarm <= [['electionTimeout', 100 + rand(400)]]
     # send out request vote RPCs
-    request_vote_request <= (timer.alarm * members * current_term).combos do |a,m,t|
+    request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
@@ -71,7 +71,7 @@ module Raft
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
     end
     # store votes granted in the current term
-    votes_granted_in_current_term <= (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
+    votes_granted_in_current_term <+ (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
@@ -89,7 +89,7 @@ module Raft
       # otherwise the receiver term is stale and we do nothing
     end
     # update our term
-    request_vote_term_max <= request_vote.argmax([:term], :term) do |rv|
+    request_vote_term_max <= request_vote_response.argmax([:term], :term) do |rv|
       [rv.term]
     end
     current_term <= (request_vote_term_max * current_term).pairs do |reqmax, ct|
