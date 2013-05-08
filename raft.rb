@@ -85,7 +85,7 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    server_state <=  (server_state * votes_granted_in_current_term) do |s, v|
+    server_state <=  (server_state * votes_granted_in_current_term).pairs do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
   end
