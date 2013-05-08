@@ -17,6 +17,7 @@ module Raft
     table :members, [:host]
     table :server_state, [] => [:state]
     table :current_term, [] => [:term]
+    scratch :max_term, [] => [:term]
     # keep record of all votes
     table :votes, [:term, :from] => [:is_granted]
 
@@ -30,7 +31,7 @@ module Raft
   end
 
   # TODO: is <= right to update an empty key in a table? does it overwrite or result in error?
-  
+
   bootstrap do
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
@@ -61,10 +62,19 @@ module Raft
     end
   end
 
+  # TODO: this might need to be done if we have to continually send if we don't get response
+  bloom :wait_for_vote_responses do
+  end
+
   bloom :vote_counting do
-    # step down to follower if our term is stale
+    # if sender term is stale, we reject (i.e. ignore)
+    # if our term is stale, step down to follower and update our term
     server_state <= (server_state * request_vote_response * current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' and v.term > t.term
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
+    current_term <= (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
     end
     # record votes if we are in the correct term
     votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
@@ -75,26 +85,12 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    server_state <=  server_state do |s|
+    server_state <=  (server_state * votes_granted_in_current_term) do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
   end
 
   bloom :vote_responses do
-    all_votes_for_given_term <= (request_vote_response * current_term).pairs do |rv, ct|
-      if ct.term <= rv.term
-        # our terms match, or our term is stale
-        [rv.term, rv.from, rv.from]
-      end
-      # otherwise the receiver term is stale and we do nothing
-    end
-    # update our term
-    request_vote_term_max <= request_vote_response.argmax([:term], :term) do |rv|
-      [rv.term]
-    end
-    current_term <= (request_vote_term_max * current_term).pairs do |reqmax, ct|
-      reqmax if ct < reqmax.term
-    end
   end
 
   bloom :send_heartbeats do
