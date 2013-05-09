@@ -2,12 +2,10 @@ require 'rubygems'
 require 'bud'
 require 'time'
 
-# there are different ways to do this.  this one only sends one "alarm", then GCs.
-
 # TODO: change this so that the interface is just input :set_alarm with a timeout and output :alarm with a timeout
 # all set alarm would do is delete the current alarm and start another one
 
-module ProgressTimerProto
+module ProgressTimerProtocol
   state do
     interface :input, :set_alarm, [:time_out]
     interface :output, :alarm, [:time_out]
@@ -15,19 +13,19 @@ module ProgressTimerProto
 end
 
 module ProgressTimer
-  include ProgressTimerProto
+  include ProgressTimerProtocol
 
   state do
     table :timer_state, [] => [:start_tm, :time_out]
-    table :alrm_buf, set_alarm.schema
+    table :buffer, set_alarm.schema
     periodic :timer, 0.01
   end
 
   bloom :timer_logic do
-    alrm_buf <= set_alarm
-    temp :cyc <= (alrm_buf * timer)
+    buffer <= set_alarm
+    temp :cyc <= (buffer * timer)
     timer_state <+- cyc.map {|s, t| [t.val.to_f, s.time_out]}
-    alrm_buf <- cyc.map{|s, t| s}
+    buffer <- cyc.map{|s, t| s}
 
     alarm <= (timer_state * timer).map do |s, t|
       if t.val.to_f - s.start_tm > s.time_out
@@ -36,39 +34,5 @@ module ProgressTimer
     end
 
     timer_state <- (timer_state * alarm).lefts
-  end
-end
-
-module ProgressTimerProto
-  state do
-    interface :input, :set_alarm, [:name, :time_out]
-    interface :input, :del_alarm, [:name]
-    interface :output, :alarm, [:name, :time_out]
-  end
-end
-
-module ProgressTimer
-  include ProgressTimerProto
-
-  state do
-    table :timer_state, [:name] => [:start_tm, :time_out]
-    table :alrm_buf, set_alarm.schema
-    periodic :timer, 0.01
-  end
-
-  bloom :timer_logic do
-    alrm_buf <= set_alarm
-    temp :cyc <= (alrm_buf * timer)
-    timer_state <= cyc.map {|s, t| [s.name, t.val.to_f, s.time_out]}
-    alrm_buf <- cyc.map{|s, t| s}
-
-    alarm <= (timer_state * timer).map do |s, t|
-      if t.val.to_f - s.start_tm > s.time_out
-        [s.name, s.time_out]
-      end
-    end
-
-    timer_state <- (timer_state * alarm).lefts(:name => :name)
-    timer_state <- (timer_state * del_alarm).lefts(:name => :name)
   end
 end

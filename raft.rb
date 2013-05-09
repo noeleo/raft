@@ -2,7 +2,11 @@ require 'rubygems'
 require 'bud'
 require 'progress_timer'
 
+module RaftProtocol
+end
+
 module Raft
+  include RaftProtocol
   import ProgressTimer => :timer
 
   state do
