@@ -18,15 +18,11 @@ module Raft
     table :server_state, [] => [:state]
     table :current_term, [] => [:term]
     scratch :max_term, [] => [:term]
+    # server we voted for in current term
+    table :voted_for, [:term] => [:candidate]
     # keep record of all votes
     table :votes, [:term, :from] => [:is_granted]
-
-    table :all_votes_for_given_term, [:term, :from] => [:vote] # redunency?
-
-    #table :votes, [:term, :from] => [:is_granted]
-
     scratch :votes_granted_in_current_term, [:from]
-
     scratch :request_vote_term_max, current_term.schema
   end
 
@@ -41,7 +37,7 @@ module Raft
     server_state <= [['follower']]
     current_term <= [[1]]
     # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <+- [['electionTimeout', 100 + rand(400)]]
+    timer.set_alarm <= [['electionTimeout', 100 + rand(400)]]
   end
 
   bloom :timeout do
@@ -52,8 +48,7 @@ module Raft
     server_state <= timer.alarm {|t| [['candidate']]}
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
-    # reset timer
-    # TODO: do this correctly
+    # reset timer TODO: do this correctly, since we only have 1 timer with same name each time, we should just have reset interface with single timer
     timer.set_alarm <= [['electionTimeout', 100 + rand(400)]]
     # send out request vote RPCs
     request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
@@ -66,9 +61,10 @@ module Raft
   bloom :wait_for_vote_responses do
   end
 
+  # TODO: have to change names of max_term and current_term and integrate because we are doing the same thing for vote_counting and vote_casting but on diff channels, maybe make a block for that?
   bloom :vote_counting do
-    # if sender term is stale, we reject (i.e. ignore)
-    # if our term is stale, step down to follower and update our term
+    # if we discover our term is stale, step down to follower and update our term
+    # TODO: do we have to reset timer if we revert to follower here?
     server_state <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
@@ -90,7 +86,16 @@ module Raft
     end
   end
 
-  bloom :vote_responses do
+  bloom :vote_casting do
+    # if we discover our term is stale, step down to follower and update our term
+    server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
+    current_term <= (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
+    end
+    # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
   end
 
   bloom :send_heartbeats do

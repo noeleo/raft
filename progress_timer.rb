@@ -4,6 +4,9 @@ require 'time'
 
 # there are different ways to do this.  this one only sends one "alarm", then GCs.
 
+# TODO: change this so that the interface is just input :set_alarm with a timeout and output :alarm with a timeout
+# all set alarm would do is delete the current alarm and start another one
+
 module ProgressTimerProto
   state do
     interface :input, :set_alarm, [:name, :time_out]
