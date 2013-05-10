@@ -21,7 +21,7 @@ module Raft
 
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
-    table :server_state, [] => [:state]
+    table :server_state, [:state]
     table :current_term, [:term]
     scratch :max_term, [] => [:term]
     # server we voted for in current term
@@ -49,6 +49,7 @@ module Raft
   end
 
   bloom :timeout do
+    stdio <~ [["timeout"]]
     # TODO: change timer so that we can just reset it, not name it every time
     # increment current term
     current_term <= (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
@@ -63,6 +64,7 @@ module Raft
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
+    stdio <~ [["end timeout"]]
   end
 
   # TODO: this might need to be done if we have to continually send if we don't get response
@@ -71,6 +73,7 @@ module Raft
 
   # TODO: have to change names of max_term and current_term and integrate because we are doing the same thing for vote_counting and vote_casting but on diff channels, maybe make a block for that?
   bloom :vote_counting do
+    stdio <~ [["begin vote_counting"]]
     # if we discover our term is stale, step down to follower and update our term
     # TODO: do we have to reset timer if we revert to follower here?
     server_state <+- (server_state * request_vote_response * current_term).combos do |s, v, t|
@@ -92,9 +95,11 @@ module Raft
     server_state <=  (server_state * votes_granted_in_current_term).pairs do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
+    stdio <~ [["end vote_counting"]]
   end
 
   bloom :vote_casting do
+    stdio <~ [["begin vote_casting"]]
     # if we discover our term is stale, step down to follower and update our term
     server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
@@ -120,6 +125,7 @@ module Raft
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
 
+    stdio <~ [["end vote_casting"]]
   end
 
   bloom :send_heartbeats do
