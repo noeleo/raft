@@ -39,7 +39,7 @@ module Raft
   bootstrap do
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
-    members <= [['localhost:54321'], ['localhost:54322'], ['localhost:54323']]
+    members <= [['localhost:54321'], ['localhost:54322'], ['localhost:54323'], ['localhost:54324'], ['localhost:54325']]
     # TODO: is this going to work to remove yourself? need it to happen now, not later
     members <- [[ip_port]]
     server_state <= [['follower']]

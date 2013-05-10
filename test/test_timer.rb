@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'bud'
+require 'test/unit'
 
 require 'progress_timer'
 
@@ -9,66 +10,68 @@ require 'progress_timer'
 class RealTimer
   include Bud
   include ProgressTimer
+
+  state do
+    table :alarms, [:timestamp]
+  end
+
+  bloom do
+    alarms <= alarm {|a| [budtime]}
+  end
 end
 
 class TestTimer < Test::Unit::TestCase
-  def single_workload(fd)
-    fd.sync_do { fd.pipe_in <+ [ ["localhost:54322", "localhost:54321", 3, "qux"] ] }
-  end
-
-  def multiple_workload(fd1, fd2, fd3, fd4)
-    fd1.sync_do { fd1.pipe_in <+ [ ["localhost:12345", "localhost:12341", 3, "a"] ] }
-  end
-
   def test_alarm_going_off
     timer = RealTimer.new
     timer.run_bg
-
-    sender_instance = FC.new(:port => 54321)
-    receiver_instance = FC.new(:port => 54322)
-
-    sender_instance.run_bg
-    receiver_instance.run_bg
-    single_workload(sender_instance)
-    4.times {receiver_instance.sync_do}
-    receiver_instance.sync_do do
-      receiver_instance.timestamped.each do |t|
-        receiver_instance.timestamped.each do |t2|
-          if t.ident < t2.ident
-            assert(t.time < t2.time)
-          end
-        end
-      end
-      assert_equal(4, receiver_instance.timestamped.length)
-    end
+    # set timer for 3 seconds
+    timer.async_do { timer.set_alarm <+ [[3000]] }
+    # wait a second and make sure the alarm doesn't go off
+    sleep 1
+    assert_equal(0, timer.alarms.length)
+    # wait another second and make sure it's still not off
+    sleep 1
+    assert_equal(0, timer.alarms.length)
+    # wait 1.5 more seconds and the alarm should have went off
+    sleep 1.5
+    assert_equal(1, timer.alarms.length)
   end
 
-  def test_fifo_multiple_senders
-    sender1 = FC.new(:port => 12341)
-    sender2 = FC.new(:port => 12342)
-    sender3 = FC.new(:port => 12343)
-    sender4 = FC.new(:port => 12344)
-    receiver = FC.new(:port => 12345)
-
-    sender1.run_bg
-    sender2.run_bg
-    sender3.run_bg
-    sender4.run_bg
-    receiver.run_bg
-    multiple_workload(sender1, sender2, sender3, sender4)
-
-    16.times {receiver.sync_do}
-    receiver.sync_do do
-      receiver.timestamped.each do |t1|
-        receiver.timestamped.each do |t2|
-          # if these are from the same source, lower idents should happen earlier
-          if t1.src == t2.src and t1.ident < t2.ident
-            assert(t1.time < t2.time)
-          end
-        end
-      end
-      assert_equal(16, receiver.timestamped.length)
-    end
+  def test_multiple_alarms
+    timer = RealTimer.new
+    timer.run_bg
+    # set timer for 3 seconds
+    timer.async_do { timer.set_alarm <+ [[3000]] }
+    # wait a second and make sure the alarm doesn't go off
+    sleep 1
+    assert_equal(0, timer.alarms.length)
+    # wait 3 more seconds and the alarm should have went off
+    sleep 3
+    assert_equal(1, timer.alarms.length)
+    # set another alarm and make sure it doesn't go off after a second
+    timer.async_do { timer.set_alarm <+ [[3000]] }
+    sleep 1
+    assert_equal(1, timer.alarms.length)
+    # make sure it goes off after another 3 seconds
+    sleep 3
+    assert_equal(2, timer.alarms.length)
   end
 
+  def test_reset_alarm
+    timer = RealTimer.new
+    timer.run_bg
+    # set timer for 3 seconds
+    timer.async_do { timer.set_alarm <+ [[3000]] }
+    # wait 2 seconds and make sure alarm doesn't go off
+    sleep 2
+    assert_equal(0, timer.alarms.length)
+    # reset the alarm
+    timer.async_do { timer.set_alarm <+ [[3000]] }
+    # wait another 2 seconds and the alarm should not have went off still
+    sleep 2
+    assert_equal(0, timer.alarms.length)
+    # wait another 1.5 seconds and it should go off
+    sleep 1.5
+    assert_equal(1, timer.alarms.length)
+  end
 end

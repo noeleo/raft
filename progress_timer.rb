@@ -2,9 +2,6 @@ require 'rubygems'
 require 'bud'
 require 'time'
 
-# TODO: change this so that the interface is just input :set_alarm with a timeout and output :alarm with a timeout
-# all set alarm would do is delete the current alarm and start another one
-
 module ProgressTimerProtocol
   state do
     interface :input, :set_alarm, [:time_out]
@@ -16,7 +13,7 @@ module ProgressTimer
   include ProgressTimerProtocol
 
   state do
-    table :timer_state, [:start_tm, :time_out]
+    table :timer_state, [] => [:start_tm, :time_out]
     table :buffer, set_alarm.schema
     periodic :timer, 0.01
   end
@@ -27,9 +24,8 @@ module ProgressTimer
     timer_state <+- cyc.map {|s, t| [t.val.to_f, s.time_out]}
     buffer <- cyc.map{|s, t| s}
 
-    #stdio <~ (timer_state * timer).map {|s,t| ["#{t.val.to_f} - #{s.start_tm} > #{s.time_out}"]}
     alarm <= (timer_state * timer).map do |s, t|
-      [s.time_out] if t.val.to_f - s.start_tm > s.time_out.to_f / 1000
+      [s.time_out] if t.val.to_f - s.start_tm > (s.time_out.to_f/1000.0)
     end
 
     timer_state <- (timer_state * alarm).lefts
