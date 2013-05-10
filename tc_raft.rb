@@ -18,7 +18,7 @@ class TestRaft < Test::Unit::TestCase
     p2.run_bg
 
     p3 = RaftBloom.new(:port=>54323)
-    p4.run_bg
+    p3.run_bg
 
     p4 = RaftBloom.new(:port=>54324)
     p4.run_bg
@@ -29,7 +29,8 @@ class TestRaft < Test::Unit::TestCase
     #TEST CASE 1: Make Sure Each Node starts off as a follower
     listOfServers = [p1, p2, p3, p4, p5]
     p1.sync_do do 
-        assert_equal(p1.server_state, "follower")
+        puts p1.server_state.inspected
+        assert_equal(p1.server_state.inspected, "follower")
     end
 
     

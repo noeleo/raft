@@ -24,6 +24,7 @@ module ProgressTimer
   bloom :timer_logic do
     buffer <= set_alarm
     temp :cyc <= (buffer * timer)
+    stdio <~ cyc.inspected
     timer_state <+- cyc.map {|s, t| [t.val.to_f, s.time_out]}
     buffer <- cyc.map{|s, t| s}
 
