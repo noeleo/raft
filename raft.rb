@@ -78,7 +78,7 @@ module Raft
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
     # reset the alarm
-    timer.set_alarm <= [[100 + rand(400)]]
+    timer.set_alarm <= timer.alarm {|a| [[100 + rand(400)]]}
     # send out request vote RPCs
     request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
       # TODO: put actual indicies in here after we implement logs
@@ -121,9 +121,9 @@ module Raft
         [r.from, ip_port, t.term, false]
       end
     end
-    timer.set_alarm <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-      [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
-    end
+    #timer.set_alarm <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+    #  [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
+    #end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
