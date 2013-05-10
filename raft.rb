@@ -48,6 +48,27 @@ module Raft
     timer.set_alarm <= [[100 + rand(400)]]
   end
 
+  bloom :step_down do
+    # if we discover our term is stale, step down to follower and update our term
+    # TODO: do we have to reset timer if we revert to follower here?
+    server_state <+- (server_state * request_vote_response * current_term).combos do |s, v, t|
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
+    current_term <= (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
+    end
+    # sdfsdfsdf
+    # if we discover our term is stale, step down to follower and update our term
+    server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
+    current_term <= (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
+    end
+  end
+
   bloom :timeout do
     stdio <~ [["timeout"]]
     # increment current term
@@ -73,15 +94,6 @@ module Raft
   # TODO: have to change names of max_term and current_term and integrate because we are doing the same thing for vote_counting and vote_casting but on diff channels, maybe make a block for that?
   bloom :vote_counting do
     stdio <~ [["begin vote_counting"]]
-    # if we discover our term is stale, step down to follower and update our term
-    # TODO: do we have to reset timer if we revert to follower here?
-    server_state <+- (server_state * request_vote_response * current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
-    end
-    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
-    current_term <= (max_term * current_term).pairs do |m,c|
-      [m.term] if m.term > c.term
-    end
     # record votes if we are in the correct term
     votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
@@ -99,14 +111,6 @@ module Raft
 
   bloom :vote_casting do
     stdio <~ [["begin vote_casting"]]
-    # if we discover our term is stale, step down to follower and update our term
-    server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
-    end
-    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
-    current_term <= (max_term * current_term).pairs do |m,c|
-      [m.term] if m.term > c.term
-    end
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs(:term => :term) {|v, t| [v.candidate]}
     voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :dest)
@@ -123,7 +127,6 @@ module Raft
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
-
     stdio <~ [["end vote_casting"]]
   end
 

@@ -15,7 +15,7 @@ module ProgressTimer
   state do
     table :timer_state, [] => [:start_tm, :time_out]
     table :buffer, set_alarm.schema
-    periodic :timer, 0.01
+    periodic :timer, 0.001
   end
 
   bloom :timer_logic do
