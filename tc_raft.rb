@@ -30,7 +30,7 @@ class TestRaft < Test::Unit::TestCase
     listOfServers = [p1, p2, p3, p4, p5]
     p1.sync_do do 
         puts p1.server_state.inspected
-        assert_equal(p1.server_state.inspected, "follower")
+        assert_equal(p1.server_state.values[0][0], "follower")
     end
 
     
