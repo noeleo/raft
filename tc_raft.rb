@@ -28,12 +28,11 @@ class TestRaft < Test::Unit::TestCase
 
     #TEST CASE 1: Make Sure Each Node starts off as a follower
     listOfServers = [p1, p2, p3, p4, p5]
-    p1.sync_do do 
-        puts p1.server_state.inspected
-        assert_equal(p1.server_state.values[0][0], "follower")
+    listOfServers.each do |server|
+      server.sync_do do 
+        assert_equal(server.server_state.values[0], ["follower"])
+      end
     end
-
-    
 
     # acks = p1.sync_callback(:kvput, [[1, :joe, 1, :hellerstein]], :kv_acks)
     # assert_equal([[1]], acks)
