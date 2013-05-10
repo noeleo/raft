@@ -16,7 +16,7 @@ module ProgressTimer
   include ProgressTimerProtocol
 
   state do
-    table :timer_state, [] => [:start_tm, :time_out]
+    table :timer_state, [:start_tm, :time_out]
     table :buffer, set_alarm.schema
     periodic :timer, 0.01
   end
