@@ -27,8 +27,9 @@ module ProgressTimer
     timer_state <+- cyc.map {|s, t| [t.val.to_f, s.time_out]}
     buffer <- cyc.map{|s, t| s}
 
+    #stdio <~ (timer_state * timer).map {|s,t| ["#{t.val.to_f} - #{s.start_tm} > #{s.time_out}"]}
     alarm <= (timer_state * timer).map do |s, t|
-      [s.time_out] if t.val.to_f - s.start_tm > s.time_out
+      [s.time_out] if t.val.to_f - s.start_tm > s.time_out.to_f / 1000
     end
 
     timer_state <- (timer_state * alarm).lefts

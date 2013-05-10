@@ -34,6 +34,11 @@ class TestRaft < Test::Unit::TestCase
       end
     end
 
+    (1..10).each { listOfServers.each {|s| s.sync_do } }
+
+    binding.pry
+    1==1
+
     # acks = p1.sync_callback(:kvput, [[1, :joe, 1, :hellerstein]], :kv_acks)
     # assert_equal([[1]], acks)
 
