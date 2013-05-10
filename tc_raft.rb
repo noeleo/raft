@@ -26,6 +26,12 @@ class TestRaft < Test::Unit::TestCase
     p5 = RaftBloom.new(:port=>54325)
     p5.run_bg
 
+    #TEST CASE 1: Make Sure Each Node starts off as a follower
+    listOfServers = [p1, p2, p3, p4, p5]
+    p1.sync_do do 
+        assert_equal(p1.server_state, "follower")
+    end
+
     
 
     # acks = p1.sync_callback(:kvput, [[1, :joe, 1, :hellerstein]], :kv_acks)

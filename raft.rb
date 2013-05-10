@@ -43,7 +43,7 @@ module Raft
     server_state <= [['follower']]
     current_term <= [[1]]
     # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <= [['electionTimeout', 100 + rand(400)]]
+    timer.set_alarm <= [[100 + rand(400)]]
   end
 
   bloom :timeout do
