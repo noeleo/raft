@@ -60,7 +60,7 @@ module Raft
     end
     # sdfsdfsdf
     # if we discover our term is stale, step down to follower and update our term
-    server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+    server_state <+- (server_state * request_vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
@@ -72,7 +72,7 @@ module Raft
   bloom :timeout do
     stdio <~ [["timeout"]]
     # increment current term
-    current_term <= (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
+    current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
     server_state <= timer.alarm {|t| [['candidate']]}
     # vote for yourself
@@ -113,7 +113,7 @@ module Raft
     stdio <~ [["begin vote_casting"]]
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs(:term => :term) {|v, t| [v.candidate]}
-    voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :dest)
+    voted_for_in_current_step <= request_vote_request.argagg(:choose, :dest, [])
     request_vote_response <~ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       if r.from == v.candidate and voted_for_in_current_term.count == 0
         [r.from, ip_port, t.term, true]
