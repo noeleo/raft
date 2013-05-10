@@ -25,7 +25,7 @@ class TestTimer < Test::Unit::TestCase
     timer = RealTimer.new
     timer.run_bg
     # set timer for 3 seconds
-    timer.async_do { timer.set_alarm <+ [[3000]] }
+    timer.sync_do { timer.set_alarm <+ [[3000]] }
     # wait a second and make sure the alarm doesn't go off
     sleep 1
     assert_equal(0, timer.alarms.length)
@@ -41,7 +41,7 @@ class TestTimer < Test::Unit::TestCase
     timer = RealTimer.new
     timer.run_bg
     # set timer for 3 seconds
-    timer.async_do { timer.set_alarm <+ [[3000]] }
+    timer.sync_do { timer.set_alarm <+ [[3000]] }
     # wait a second and make sure the alarm doesn't go off
     sleep 1
     assert_equal(0, timer.alarms.length)
@@ -49,7 +49,7 @@ class TestTimer < Test::Unit::TestCase
     sleep 3
     assert_equal(1, timer.alarms.length)
     # set another alarm and make sure it doesn't go off after a second
-    timer.async_do { timer.set_alarm <+ [[3000]] }
+    timer.sync_do { timer.set_alarm <+ [[3000]] }
     sleep 1
     assert_equal(1, timer.alarms.length)
     # make sure it goes off after another 3 seconds
@@ -61,12 +61,12 @@ class TestTimer < Test::Unit::TestCase
     timer = RealTimer.new
     timer.run_bg
     # set timer for 3 seconds
-    timer.async_do { timer.set_alarm <+ [[3000]] }
-    # wait 2 seconds and make sure alarm doesn't go off
-    sleep 2
+    timer.sync_do { timer.set_alarm <+ [[3000]] }
+    # wait 1.5 seconds and make sure alarm doesn't go off
+    sleep 1.5
     assert_equal(0, timer.alarms.length)
     # reset the alarm
-    timer.async_do { timer.set_alarm <+ [[3000]] }
+    timer.sync_do { timer.set_alarm <+ [[3000]] }
     # wait another 2 seconds and the alarm should not have went off still
     sleep 2
     assert_equal(0, timer.alarms.length)

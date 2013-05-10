@@ -21,8 +21,8 @@ module Raft
 
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
-    table :server_state, [:state]
-    table :current_term, [:term]
+    table :server_state, [] => [:state]
+    table :current_term, [] => [:term]
     scratch :max_term, [] => [:term]
     # server we voted for in current term
     table :voted_for, [:term] => [:candidate]
@@ -50,14 +50,13 @@ module Raft
 
   bloom :timeout do
     stdio <~ [["timeout"]]
-    # TODO: change timer so that we can just reset it, not name it every time
     # increment current term
     current_term <= (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
     server_state <= timer.alarm {|t| [['candidate']]}
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
-    # reset timer TODO: do this correctly, since we only have 1 timer with same name each time, we should just have reset interface with single timer
+    # reset the alarm
     timer.set_alarm <= [[100 + rand(400)]]
     # send out request vote RPCs
     request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
