@@ -103,7 +103,7 @@ module Raft
     end
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs(:term => :term) {|v, t| [v.candidate]}
-    voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :candidate)
+    voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :dest)
     request_vote_response <~ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       if r.from == v.candidate and voted_for_in_current_term.count == 0
         [r.from, ip_port, t.term, true]
@@ -112,7 +112,7 @@ module Raft
       end
     end
     timer.set_alarm <~ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-      ['electionTimeout', 100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
+      [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
     end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
