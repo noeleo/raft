@@ -55,16 +55,16 @@ module Raft
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
-    current_term <= (max_term * current_term).pairs do |m,c|
+    current_term <+- (max_term * current_term).pairs do |m,c|
       [m.term] if m.term > c.term
     end
     # sdfsdfsdf
     # if we discover our term is stale, step down to follower and update our term
-    server_state <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+    server_state <+- (server_state * request_vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
-    current_term <= (max_term * current_term).pairs do |m,c|
+    current_term <+- (max_term * current_term).pairs do |m,c|
       [m.term] if m.term > c.term
     end
   end
@@ -72,13 +72,13 @@ module Raft
   bloom :timeout do
     stdio <~ [["timeout"]]
     # increment current term
-    current_term <= (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
+    current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
-    server_state <= timer.alarm {|t| [['candidate']]}
+    server_state <+- timer.alarm {|t| [['candidate']]}
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
     # reset the alarm
-    timer.set_alarm <= timer.alarm {|a| [[100 + rand(400)]]}
+    timer.set_alarm <= timer.alarm {|a| [100 + rand(400)]}
     # send out request vote RPCs
     request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
       # TODO: put actual indicies in here after we implement logs
@@ -103,7 +103,7 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    server_state <=  (server_state * votes_granted_in_current_term).pairs do |s, v|
+    server_state <+-  (server_state * votes_granted_in_current_term).pairs do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
     stdio <~ [["end vote_counting"]]
@@ -121,9 +121,9 @@ module Raft
         [r.from, ip_port, t.term, false]
       end
     end
-    #timer.set_alarm <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-    #  [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
-    #end
+    timer.set_alarm <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+      [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
+    end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
