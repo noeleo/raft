@@ -1,12 +1,14 @@
 require 'rubygems'
 require 'bud'
 require 'progress_timer'
+require 'membership'
 
 module RaftProtocol
 end
 
 module Raft
   include RaftProtocol
+  include StaticMembership
   import ProgressTimer => :timer
 
   state do
@@ -19,9 +21,9 @@ module Raft
 
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
-    table :server_state, [] => [:state]
-    table :current_term, [] => [:term]
-    scratch :max_term, [] => [:term]
+    table :server_state, [:state]
+    table :current_term, [:term]
+    scratch :max_term, [:term]
     # server we voted for in current term
     table :voted_for, [:term] => [:candidate]
     scratch :voted_for_in_current_term, [] => [:candidate]
