@@ -26,6 +26,10 @@ class TestRaft < Test::Unit::TestCase
     p5 = RaftBloom.new(:port=>54325)
     p5.run_bg
 
+    p6 = RaftBloom.new(:port=>54326)
+    p6.run_bg
+
+
     #TEST CASE 1: Make Sure Each Node starts off as a follower
     listOfServers = [p1, p2, p3, p4, p5]
     listOfServers.each do |server|
@@ -34,19 +38,31 @@ class TestRaft < Test::Unit::TestCase
       end
     end
 
+    # TEST 2: test that a leader is initially elected
+    # tick servers and assume normal operation
+    (1..10).each { 
+      listOfServers.each {|s| s.sync_do } 
+    }
+    assert listOfServers.map {|s| s.server_state.values[0].first }.any? {|str| str == 'leader'}
+
+    # TEST 3: test that there is exactly one leader
+    assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+
+    # TEST 4: test that when a leader goes offline, a new leader is elected
+    # find and stop the current leader:
+    leader = listOfServers.select {|s| s.server_state.values[0].first == 'leader'}.first
+    leader.stop
+    listOfServers.delete(leader) # remove stopped server from listOfServers
     (1..10).each { listOfServers.each {|s| s.sync_do } }
-
-    binding.pry
-    1==1
-
-    # acks = p1.sync_callback(:kvput, [[1, :joe, 1, :hellerstein]], :kv_acks)
-    # assert_equal([[1]], acks)
+    # now test that there is exactly one leader
+    assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
 
     p1.stop
     p2.stop
     p3.stop
     p4.stop
     p5.stop
+    p6.stop
   end
 end
 
