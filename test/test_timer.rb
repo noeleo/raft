@@ -5,7 +5,7 @@ require 'test/unit'
 require 'progress_timer'
 
 # run with
-# ruby -I/[path to raft directory] -I. test_timer.rb
+# ruby -I/[path to raft directory] -I. test/test_timer.rb
 
 class RealTimer
   include Bud

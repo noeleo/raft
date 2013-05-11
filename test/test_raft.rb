@@ -4,7 +4,7 @@ require 'bud'
 require 'raft'
 
 # run with
-# ruby -I/[path to raft directory] -I. test_raft.rb
+# ruby -I/[path to raft directory] -I. test/test_raft.rb
 
 class RealRaft
   include Bud
