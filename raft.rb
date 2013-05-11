@@ -56,7 +56,7 @@ module Raft
   end
 
   bloom :timeout do
-    stdio <~ [["timeout"]]
+    #stdio <~ [["timeout"]]
     # increment current term
     current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
@@ -70,7 +70,7 @@ module Raft
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
-    stdio <~ [["end timeout"]]
+    #stdio <~ [["end timeout"]]
   end
 
   # TODO: this might need to be done if we have to continually send if we don't get response
@@ -78,7 +78,7 @@ module Raft
   end
 
   bloom :vote_counting do
-    stdio <~ [["begin vote_counting"]]
+    #stdio <~ [["begin vote_counting"]]
     # if we discover our term is stale, step down to follower and update our term
     possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
@@ -93,14 +93,17 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
+    #stdio <~ [['check for consensus']]
     possible_server_states <= (server_state * votes_granted_in_current_term).pairs do |s, v|
+      #puts votes_granted_in_current_term.count
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
-    stdio <~ [["end vote_counting"]]
+    #stdio <~ possible_server_states.inspected
+    #stdio <~ [["end vote_counting"]]
   end
 
   bloom :vote_casting do
-    stdio <~ [["begin vote_casting"]]
+    #stdio <~ [["begin vote_casting"]]
     # if we discover our term is stale, step down to follower and update our term
     possible_server_states <= (server_state * request_vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
@@ -122,7 +125,7 @@ module Raft
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
-    stdio <~ [["end vote_casting"]]
+    #stdio <~ [["end vote_casting"]]
   end
 
   bloom :send_heartbeats do
@@ -137,6 +140,7 @@ module Raft
     # set timer to be 100-500 ms
     single_reset <= should_reset_timer.argagg(:choose, [], :reset)
     # TODO: set_alarm still gives duplicate key errors... wtf????
+    #stdio <~ timer.set_alarm.inspected
     timer.set_alarm <= single_reset {|s| [100 + rand(400)]}
   end
 
