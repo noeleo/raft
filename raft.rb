@@ -23,7 +23,7 @@ module Raft
 
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
-    table :leader, [:host]
+    table :leader, [] => [:host]
     table :current_term, [] => [:term]
     scratch :max_term, [:term]
     scratch :single_max_term, [] => [:term]

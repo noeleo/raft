@@ -24,7 +24,7 @@ module SnoozeTimer
     table :buffer, [:start_time] => [:time_out]
     scratch :cyc, [:start_time, :time_out]
     scratch :single_cyc, cyc.schema
-    periodic :timer, 0.001
+    periodic :timer, 0.01
   end
 
   bloom do
