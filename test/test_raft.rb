@@ -37,8 +37,11 @@ class TestRaft < Test::Unit::TestCase
     # TODO: you should put these test cases in different methods named test_<test you are performing>
     # see all other test files for reference
 
+    # TODO: tests are not being done correctly. LHS of assert_equal is the expected value and right side is the actual value
+
 
     #TEST CASE 1: Make Sure Each Node starts off as a follower
+    # TODO: this is NOT going to work. it bootstraps by sending everyone messages and the whole process begins immediately
     listOfServers = [p1, p2, p3, p4, p5]
     listOfServers.each do |server|
       server.sync_do do 

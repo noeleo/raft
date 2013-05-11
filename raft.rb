@@ -33,9 +33,10 @@ module Raft
     table :votes, [:term, :from] => [:is_granted]
     scratch :votes_granted_in_current_term, [:from]
     scratch :request_vote_term_max, current_term.schema
+    # this is to determine whether or not the timer should be reset
+    scratch :should_reset_timer, [] => [:reset]
+    scratch :single_reset, [] => [:reset]
   end
-
-  # TODO: is <= right to update an empty key in a table? does it overwrite or result in error?
 
   bootstrap do
     # add all the members of the system except yourself
@@ -49,27 +50,6 @@ module Raft
     timer.set_alarm <= [[100 + rand(400)]]
   end
 
-  # don't have to reset timer when we step down
-  bloom :step_down do
-    # if we discover our term is stale through an RPC call, step down to follower and update our term
-    # request_vote_response
-    possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
-    end
-    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
-    current_term <+- (max_term * current_term).pairs do |m,c|
-      [m.term] if m.term > c.term
-    end
-    # request_vote_request
-    possible_server_states <= (server_state * request_vote_request * current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
-    end
-    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
-    current_term <+- (max_term * current_term).pairs do |m,c|
-      [m.term] if m.term > c.term
-    end
-  end
-
   bloom :timeout do
     stdio <~ [["timeout"]]
     # increment current term
@@ -79,7 +59,7 @@ module Raft
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
     # reset the alarm
-    timer.set_alarm <+ timer.alarm {|a| [100 + rand(400)]}
+    should_reset_timer <= timer.alarm {|a| [true]}
     # send out request vote RPCs
     request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
       # TODO: put actual indicies in here after we implement logs
@@ -95,6 +75,14 @@ module Raft
   # TODO: have to change names of max_term and current_term and integrate because we are doing the same thing for vote_counting and vote_casting but on diff channels, maybe make a block for that?
   bloom :vote_counting do
     stdio <~ [["begin vote_counting"]]
+    # if we discover our term is stale, step down to follower and update our term
+    possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
+    current_term <+- (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
+    end
     # record votes if we are in the correct term
     votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
@@ -112,6 +100,14 @@ module Raft
 
   bloom :vote_casting do
     stdio <~ [["begin vote_casting"]]
+    # if we discover our term is stale, step down to follower and update our term
+    possible_server_states <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+    end
+    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
+    current_term <+- (max_term * current_term).pairs do |m,c|
+      [m.term] if m.term > c.term
+    end
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs(:term => :term) {|v, t| [v.candidate]}
     voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :from) {|v| [v.from]}
@@ -122,8 +118,8 @@ module Raft
         [r.from, ip_port, t.term, false]
       end
     end
-    timer.set_alarm <+ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-      [100 + rand(400)] if r.from == v.candidate and not voted_for_in_current_term.exists?
+    should_reset_timer <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+      [true] if r.from == v.candidate and not voted_for_in_current_term.exists?
     end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
@@ -134,4 +130,10 @@ module Raft
   bloom :send_heartbeats do
   end
 
+  bloom :reset_timer do
+    # set timer to be 100-500 ms
+    single_reset <= should_reset_timer.argagg(:choose, [], :reset)
+    # TODO: set_alarm still gives duplicate key errors... wtf????
+    timer.set_alarm <= single_reset {|s| [100 + rand(400)]}
+  end
 end
