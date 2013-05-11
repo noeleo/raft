@@ -2,14 +2,14 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 
-require 'progress_timer'
+require 'snooze_timer'
 
 # run with
 # ruby -I/[path to raft directory] -I. test/test_timer.rb
 
 class RealTimer
   include Bud
-  include ProgressTimer
+  include SnoozeTimer
 
   state do
     table :alarms, [:timestamp]

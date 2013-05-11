@@ -1,6 +1,6 @@
 require 'rubygems'
 require 'bud'
-require 'progress_timer'
+require 'snooze_timer'
 require 'membership'
 require 'server_state'
 
@@ -11,7 +11,7 @@ module Raft
   include RaftProtocol
   include StaticMembership
   include ServerState
-  import ProgressTimer => :timer
+  import SnoozeTimer => :timer
 
   state do
     # see Figure 2 in Raft paper to see definitions of RPCs
@@ -122,9 +122,9 @@ module Raft
         [r.from, ip_port, t.term, false]
       end
     end
-    #timer.set_alarm <+ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-    #  [100 + rand(400)] if r.from == v.candidate and not voted_for_in_current_term.exists?
-    #end
+    timer.set_alarm <+ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+      [100 + rand(400)] if r.from == v.candidate and not voted_for_in_current_term.exists?
+    end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
     end
