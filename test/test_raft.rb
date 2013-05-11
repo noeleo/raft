@@ -11,6 +11,14 @@ require 'raft'
 class RealRaft
   include Bud
   include Raft
+
+  state do
+    table :states, [:timestamp] => [:state]
+  end
+
+  bloom do
+    states <= server_state {|s| [budtime, s.state]}
+  end
 end
 
 class TestRaft < Test::Unit::TestCase

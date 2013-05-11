@@ -52,7 +52,7 @@ module Raft
     server_state <= [['follower']]
     current_term <= [[1]]
     # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <= [[100 + rand(400)]]
+    timer.set_alarm <= [[budtime, 100 + rand(400)]]
   end
 
   bloom :timeout do
@@ -141,7 +141,7 @@ module Raft
     single_reset <= should_reset_timer.argagg(:choose, [], :reset)
     # TODO: set_alarm still gives duplicate key errors... wtf????
     #stdio <~ timer.set_alarm.inspected
-    timer.set_alarm <= single_reset {|s| [100 + rand(400)]}
+    timer.set_alarm <= single_reset {|s| [budtime, 100 + rand(400)]}
   end
 
   # take the max of all the possible terms and set that as the current term

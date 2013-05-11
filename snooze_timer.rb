@@ -9,7 +9,7 @@ require 'time'
 
 module SnoozeTimerProtocol
   state do
-    interface :input, :set_alarm, [] => [:time_out]
+    interface :input, :set_alarm, [:start_time] => [:time_out]
     interface :output, :alarm, [] => [:time_out]
   end
 end
