@@ -19,7 +19,7 @@ module ServerState
     table :server_state, [] => [:state]
   end
 
-  bloom do
+  bloom :manage_state do
     temp :reordered <= possible_server_states do |s|
       [STATE_TO_ORDER[s.state]]
     end
