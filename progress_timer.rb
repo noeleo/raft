@@ -4,8 +4,8 @@ require 'time'
 
 module ProgressTimerProtocol
   state do
-    interface :input, :set_alarm, [:time_out]
-    interface :output, :alarm, [:time_out]
+    interface :input, :set_alarm, [] => [:time_out]
+    interface :output, :alarm, [] => [:time_out]
   end
 end
 
@@ -15,19 +15,17 @@ module ProgressTimer
   state do
     table :timer_state, [] => [:start_tm, :time_out]
     table :buffer, set_alarm.schema
+    scratch :cyc, timer_state.schema
     periodic :timer, 0.001
   end
 
-  bloom :timer_logic do
+  bloom do
     buffer <= set_alarm
-    temp :cyc <= (buffer * timer)
-    stdio <~ set_alarm.inspected
-    stdio <~ buffer.inspected
-    stdio <~ cyc.inspected
-    timer_state <+- cyc.map {|s, t| [t.val.to_f, s.time_out]}
-    buffer <- cyc.map{|s, t| s}
+    cyc <= (buffer * timer).pairs {|b, t| [t.val.to_f, b.time_out]}
+    timer_state <+- cyc
+    buffer <- cyc {|c| [c.time_out]}
 
-    alarm <= (timer_state * timer).map do |s, t|
+    alarm <= (timer_state * timer).pairs do |s, t|
       [s.time_out] if t.val.to_f - s.start_tm > (s.time_out.to_f/1000.0)
     end
 

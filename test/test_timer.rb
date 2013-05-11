@@ -74,4 +74,18 @@ class TestTimer < Test::Unit::TestCase
     sleep 1.5
     assert_equal(1, timer.alarms.length)
   end
+
+  # this doesn't work in actual operation... should be key constraint error, should it not?
+  def test_multiple_timers_at_same_tick
+    timer = RealTimer.new
+    timer.run_bg
+    # set timers for 3 seconds
+    timer.sync_do { timer.set_alarm <+ [[3000], [3000]] }
+    # wait a second and make sure alarm doesn't go off
+    sleep 1
+    assert_equal(0, timer.alarms.length)
+    # wait another few seconds until it goes off
+    sleep 3
+    assert_equal(1, timer.alarms.length)
+  end
 end
