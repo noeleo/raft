@@ -22,6 +22,8 @@ module Raft
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
     table :server_state, [] => [:state]
+    # store server states that could be generated in this tick
+    scratch :possible_server_states, [:state]
     table :current_term, [] => [:term]
     scratch :max_term, [] => [:term]
     # server we voted for in current term
@@ -48,19 +50,19 @@ module Raft
     timer.set_alarm <= [[100 + rand(400)]]
   end
 
+  # don't have to reset timer when we step down
   bloom :step_down do
-    # if we discover our term is stale, step down to follower and update our term
-    # TODO: do we have to reset timer if we revert to follower here?
-    server_state <+- (server_state * request_vote_response * current_term).combos do |s, v, t|
+    # if we discover our term is stale through an RPC call, step down to follower and update our term
+    # request_vote_response
+    possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
     current_term <+- (max_term * current_term).pairs do |m,c|
       [m.term] if m.term > c.term
     end
-    # sdfsdfsdf
-    # if we discover our term is stale, step down to follower and update our term
-    server_state <+- (server_state * request_vote_request * current_term).combos do |s, v, t|
+    # request_vote_request
+    possible_server_states <= (server_state * request_vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
@@ -103,7 +105,7 @@ module Raft
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    server_state <+-  (server_state * votes_granted_in_current_term).pairs do |s, v|
+    possible_server_states <= (server_state * votes_granted_in_current_term).pairs do |s, v|
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
     stdio <~ [["end vote_counting"]]
@@ -113,7 +115,8 @@ module Raft
     stdio <~ [["begin vote_casting"]]
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs(:term => :term) {|v, t| [v.candidate]}
-    voted_for_in_current_step <= request_vote_request.argagg(:choose, :dest, [])
+    stdio <~ request_vote_request.argagg(:choose, [], :from) {|v| [v.from]}
+    voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :from) {|v| [v.from]}
     request_vote_response <~ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       if r.from == v.candidate and voted_for_in_current_term.count == 0
         [r.from, ip_port, t.term, true]
@@ -122,7 +125,7 @@ module Raft
       end
     end
     timer.set_alarm <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-      [100 + rand(400)] if r.from == v.candidate and voted_for_in_current_term.count == 0
+      [100 + rand(400)] if r.from == v.candidate and not voted_for_in_current_term.exists?
     end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
       [t.term, v.candidate] if voted_for_in_current_term.count == 0
