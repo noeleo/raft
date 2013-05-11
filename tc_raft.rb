@@ -38,24 +38,43 @@ class TestRaft < Test::Unit::TestCase
       end
     end
 
-    # TEST 2: test that a leader is initially elected
+    # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
     (1..10).each { 
       listOfServers.each {|s| s.sync_do } 
     }
     assert listOfServers.map {|s| s.server_state.values[0].first }.any? {|str| str == 'leader'}
 
-    # TEST 3: test that there is exactly one leader
+    # TEST : test that there is exactly one leader
     assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
 
-    # TEST 4: test that when a leader goes offline, a new leader is elected
+    # TEST : test that when a leader goes offline, a new leader is elected
     # find and stop the current leader:
     leader = listOfServers.select {|s| s.server_state.values[0].first == 'leader'}.first
     leader.stop
     listOfServers.delete(leader) # remove stopped server from listOfServers
     (1..10).each { listOfServers.each {|s| s.sync_do } }
+
     # now test that there is exactly one leader
     assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+
+    # CLEAN UP: add leader back to listOfServers
+    listOfServers << leader
+
+
+    # TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term
+    # find a follower:
+    follower = listOfServers.select {|s| s.server_state.values[0].first == 'leader'}.first
+    follower_term = follower.current_term.values[0].first
+
+    #send follower a vote request with term greater than its term
+      # request_vote_request:
+      # [:@dest, :from, :term, :last_log_index, :last_log_term]
+    follower.sync_do {|s| s.request_vote_request <~ [[ip_port, ip_port, follower_term + 1, 1234, :last_log_term]] }
+    (1..5).each { follower.sync_do }
+    # now test that follower incremented its term appropriately
+    assert follower.current_term.values[0].first == follower_term + 1
+
 
     p1.stop
     p2.stop
