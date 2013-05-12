@@ -1,23 +1,29 @@
 Raft Consensus Protocol in Bud
 ==============================
-Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley
-
-For CS 194, Distributed Systems, taught by Joe Hellerstein and Peter Alvaro
-
-Thanks to Diego Ongaro from Stanford for being an advisor for the Raft Protocol.
+Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley. For CS 194: Distributed System, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor for the Raft Protocol.
 
 Modules
 -------
-We have decomposed some elements of our implementatio into modules that can stand alone and be tested in isolation.
+We have decomposed some elements of our implementation into modules that can stand alone and be tested in isolation.
+
 ### Server State
 The state of the server is managed by the ServerState Module.
 ### Snooze Timer
 The election timer is handled by the SnoozeTimer Module.
-Raft
-----
-Raft is good.
-Tests
------
+
+## Raft
+Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:
+`[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`
+Then, to run the code, something like this should be done:
+```ruby
+cluster = [['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]
+r = RaftInstance.new(:port => 54321)
+r.set_cluster(cluster)
+r.run_bg
+```
+An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.
+
+## Tests
 Test Cases to put in
 
 NOTE: Timeout depends on proc speed. Noel's comp is 100 + rand(100) 2.26GHZ core 2 duo

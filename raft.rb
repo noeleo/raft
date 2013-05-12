@@ -14,11 +14,8 @@ module Raft
   import SnoozeTimer => :timer
   #import ProgressTimer => :timer
 
-  def set_cluster(num_servers, server_num)
-    @HOSTS = []
-    (1..num_servers).to_a.each do |num|
-      @HOSTS << ["localhost:#{54320+num}"] unless num == server_num
-    end
+  def set_cluster(cluster)
+    @HOSTS = cluster - [[ip_port]]
   end
 
   state do

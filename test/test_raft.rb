@@ -26,26 +26,36 @@ end
 
 class TestRaft < Test::Unit::TestCase
 
+  # create a cluster of servers with addresses localhost:<54320+num>
+  # without yourself
+  def create_cluster(num_servers)
+    cluster = []
+    (1..num_servers).to_a.each do |num|
+      cluster << ["127.0.0.1:#{54320+num}"]
+    end
+    return cluster
+  end
+
   def test_raft
-    num_servers = 5
+    cluster = create_cluster(5)
     p1 = RealRaft.new(:port=>54321)
-    p1.set_cluster(num_servers, 1)
+    p1.set_cluster(cluster)
     p1.run_bg
 
     p2 = RealRaft.new(:port=>54322)
-    p1.set_cluster(num_servers, 2)
+    p2.set_cluster(cluster)
     p2.run_bg
 
     p3 = RealRaft.new(:port=>54323)
-    p1.set_cluster(num_servers, 3)
+    p3.set_cluster(cluster)
     p3.run_bg
 
     p4 = RealRaft.new(:port=>54324)
-    p1.set_cluster(num_servers, 4)
+    p4.set_cluster(cluster)
     p4.run_bg
 
     p5 = RealRaft.new(:port=>54325)
-    p1.set_cluster(num_servers, 5)
+    p5.set_cluster(cluster)
     p5.run_bg
 
 
@@ -67,7 +77,7 @@ class TestRaft < Test::Unit::TestCase
 
     # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
-    (1..100).each { 
+    (1..20).each {
       listOfServers.each {|s| s.sync_do } 
     }
     #puts p1.methods
@@ -116,7 +126,6 @@ class TestRaft < Test::Unit::TestCase
     p3.stop
     p4.stop
     p5.stop
-    p6.stop
   end
 end
 
