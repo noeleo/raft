@@ -1,13 +1,15 @@
 Raft Consensus Protocol in Bud
 ==============================
-### Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder
+Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley
+For CS 194, Distributed Systems, taught by Joe Hellerstein and Peter Alvaro
+Thanks to Diego Ongaro from Stanford for being an advisor for the Raft Protocol.
 
-Server State
-------------
+Modules
+-------
+### Server State
 The state of the server is managed by the ServerState Module.
 
-Snooze Timer
-------------
+### Snooze Timer
 The election timer is handled by the SnoozeTimer Module.
 
 Raft
