@@ -13,11 +13,14 @@ class RealRaft
   include Raft
 
   state do
-    table :states, [:timestamp] => [:state]
+    table :states, [:timestamp] => [:state, :term]
   end
 
   bloom do
-    states <= server_state {|s| [budtime, s.state]}
+    states <= (server_state * current_term).pairs  do |s, t| [budtime, s.state, t.term] end
+    #stdio <~ votes do |v|
+    #    [v.term, v.from, v.is_granted] if v.from == ip_port
+    #end
   end
 end
 
@@ -59,10 +62,12 @@ class TestRaft < Test::Unit::TestCase
 
     # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
-    (1..10).each { 
+    (1..25).each { 
       listOfServers.each {|s| s.sync_do } 
     }
+    #puts p1.methods
     #listOfServers.map{|s| puts s.server_state.values[0]}
+    #puts p1.state.inspected
     assert listOfServers.map {|s| s.server_state.values[0].first }.any? {|str| str == 'leader'}
 
     # TEST : test that there is exactly one leader
