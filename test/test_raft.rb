@@ -25,24 +25,28 @@ class RealRaft
 end
 
 class TestRaft < Test::Unit::TestCase
+
   def test_raft
+    num_servers = 5
     p1 = RealRaft.new(:port=>54321)
+    p1.set_cluster(num_servers, 1)
     p1.run_bg
 
     p2 = RealRaft.new(:port=>54322)
+    p1.set_cluster(num_servers, 2)
     p2.run_bg
 
     p3 = RealRaft.new(:port=>54323)
+    p1.set_cluster(num_servers, 3)
     p3.run_bg
 
     p4 = RealRaft.new(:port=>54324)
+    p1.set_cluster(num_servers, 4)
     p4.run_bg
 
     p5 = RealRaft.new(:port=>54325)
+    p1.set_cluster(num_servers, 5)
     p5.run_bg
-
-    p6 = RealRaft.new(:port=>54326)
-    p6.run_bg
 
 
     # TODO: you should put these test cases in different methods named test_<test you are performing>
@@ -55,14 +59,15 @@ class TestRaft < Test::Unit::TestCase
     # TODO: this is NOT going to work. it bootstraps by sending everyone messages and the whole process begins immediately
     listOfServers = [p1, p2, p3, p4, p5]
     listOfServers.each do |server|
-      server.sync_do do 
+      server.tick
+      #server.sync_do do 
         #assert_equal(["follower"], server.server_state.values[0][0])
-      end
+      #end
     end
 
     # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
-    (1..25).each { 
+    (1..100).each { 
       listOfServers.each {|s| s.sync_do } 
     }
     #puts p1.methods

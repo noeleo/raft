@@ -12,8 +12,15 @@ module Raft
   include RaftProtocol
   include StaticMembership
   include ServerState
-  #import SnoozeTimer => :timer
-  import ProgressTimer => :timer
+  import SnoozeTimer => :timer
+  #import ProgressTimer => :timer
+
+  def set_cluster(num_servers, server_num)
+    @HOSTS = []
+    (1..num_servers).to_a.each do |num|
+      @HOSTS << ["localhost:#{54320+num}"] unless num == server_num
+    end
+  end
 
   state do
     # see Figure 2 in Raft paper to see definitions of RPCs
@@ -48,26 +55,25 @@ module Raft
   bootstrap do
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
-    members <= [['localhost:54321'], ['localhost:54322'], ['localhost:54323'], ['localhost:54324'], ['localhost:54325']]
-    # TODO: is this going to work to remove yourself? need it to happen now, not later
-    members <- [[ip_port]]
+    members <= @HOSTS
     server_state <= [['follower']]
     current_term <= [[1]]
     # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <= [[budtime, 100 + rand(400)]]
+    timer.set_alarm <= [[budtime, 100]]
   end
 
   bloom :timeout do
     # increment current term
     current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
-    server_state <+- timer.alarm {|t| ['candidate']}
+    possible_server_states <= timer.alarm {|t| ['candidate']}
+    stdio <~ server_state.inspected
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
     # reset the alarm
     should_reset_timer <= timer.alarm {|a| [true]}
     # send out request vote RPCs
-    request_vote_request <~ (timer.alarm * members * current_term).combos do |a,m,t|
+    request_vote_request <~ (timer.alarm * members * current_term).combos do |a, m, t|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
@@ -142,7 +148,7 @@ module Raft
     # TODO: set_alarm still gives duplicate key errors... wtf????
     #timer.del_alarm <= single_reset {|s| ['election']}
     #timer.set_alarm <= single_reset {|s| ['election', 100 + rand(400)]}
-    timer.set_alarm <= single_reset {|s| [budtime, 100 + rand(400)]}
+    timer.set_alarm <= single_reset {|s| [budtime, 100]}
   end
 
   # take the max of all the possible terms and set that as the current term
