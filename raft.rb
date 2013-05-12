@@ -60,28 +60,38 @@ module Raft
 
   bloom :timeout do
     # increment current term
-    current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
-    # transition to candidate state
-    possible_server_states <= timer.alarm {|t| ['candidate']}
-    stdio <~ server_state.inspected
-    # vote for yourself
-    votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
-    # reset the alarm
-    should_reset_timer <= timer.alarm {|a| [true]}
-    # send out request vote RPCs
-    request_vote_request <~ (timer.alarm * members * current_term).combos do |a, m, t|
-      # TODO: put actual indicies in here after we implement logs
-      [m.host, ip_port, t.term, 0, 0]
+    current_term <+- (timer.alarm * server_state * current_term).combos do |a, s, t|
+      [t.term + 1] if s.state != 'leader'
     end
-    # TODO: send out requests if you are a candidate, with a heartbeat
+    # transition to candidate state
+    possible_server_states <= (timer.alarm * server_state).pairs do |t, s|
+      ['candidate'] if s.state != 'leader'
+    end
+    stdio <~ server_state do |s|
+      puts "#{ip_port[-1]} is now a #{s.state} in term #{current_term.first.term}"
+      [s]
+    end
+    # vote for yourself
+    votes <= (timer.alarm * server_state * current_term).combos do |a,s,t|
+      [t.term, ip_port, true] if s.state != 'leader'
+    end
+    # reset the alarm
+    should_reset_timer <= (timer.alarm * server_state).pairs do |a|
+      [true] if s.state != 'leader'
+    end
+    # send out request vote RPCs
+    request_vote_request <~ (timer.alarm * members * server_state * current_term).combos do |a, m, s, t|
+      # TODO: put actual indicies in here after we implement logs
+      [m.host, ip_port, t.term, 0, 0] if s.state != 'leader'
+    end
+  end
+
+  # send out requests if you are a candidate, with a heartbeat
+  bloom :wait_for_vote_responses do
     request_vote_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate'
     end
-  end
-
-  # TODO: this might need to be done if we have to continually send if we don't get response
-  bloom :wait_for_vote_responses do
   end
 
   bloom :vote_counting do
@@ -94,7 +104,6 @@ module Raft
     # TODO: is_granted will always be true in votes now because we send out requests all the time if
     # we are a candidate
     votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
-      puts s.state == 'candidate'
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term and v.is_granted
     end
     # store votes granted in the current term
@@ -139,10 +148,23 @@ module Raft
   end
 
   bloom :send_heartbeats do
-    #append_entries_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
-      # TODO: add legit indicies when we do logging
-    #  [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
+    append_entries_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+       # TODO: add legit indicies when we do logging
+      [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
+    end
+  end
+
+  bloom :respond_to_append_entries do
+    # reset our timer if the term is current or our term is stale
+    #should_reset_timer <= (append_entries_request * current_term).pairs do |a, t|
+      #puts 'hi'
+    #  [true] if a.term >= t.term
     #end
+    # update term if our term is stale
+    #max_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
+    # TODO: step down as leader if our term is stale
+    # TODO: respond to append entries
+    # TODO: update leader if we get an append entries (and if we are leader, only if our term is stale)
   end
 
   # if the timer should be reset, reset it here
