@@ -92,8 +92,9 @@ class TestRaft < Test::Unit::TestCase
     (1..10).each { listOfServers.each {|s| s.sync_do } }
 
     # now test that there is exactly one leader
-    assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
-
+    #assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    assert_equal(arrayOfStates.count('leader'),1) 
+    
     # CLEAN UP: add leader back to listOfServers
     listOfServers << leader
 
