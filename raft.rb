@@ -10,7 +10,6 @@ end
 
 module Raft
   include RaftProtocol
-  include StaticMembership
   include ServerState
   import SnoozeTimer => :timer
   #import ProgressTimer => :timer
