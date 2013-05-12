@@ -1,6 +1,7 @@
 require 'rubygems'
 require 'bud'
 require 'snooze_timer'
+require 'progress_timer'
 require 'membership'
 require 'server_state'
 
@@ -11,7 +12,8 @@ module Raft
   include RaftProtocol
   include StaticMembership
   include ServerState
-  import SnoozeTimer => :timer
+  #import SnoozeTimer => :timer
+  import ProgressTimer => :timer
 
   state do
     # see Figure 2 in Raft paper to see definitions of RPCs
@@ -56,11 +58,10 @@ module Raft
   end
 
   bloom :timeout do
-    #stdio <~ [["timeout"]]
     # increment current term
     current_term <+- (timer.alarm * current_term).pairs {|a,t| [t.term + 1]}
     # transition to candidate state
-    server_state <+- timer.alarm {|t| [['candidate']]}
+    server_state <+- timer.alarm {|t| ['candidate']}
     # vote for yourself
     votes <= (timer.alarm * current_term).pairs {|a,t| [t.term, ip_port, true]}
     # reset the alarm
@@ -70,7 +71,6 @@ module Raft
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
-    #stdio <~ [["end timeout"]]
   end
 
   # TODO: this might need to be done if we have to continually send if we don't get response
@@ -78,7 +78,6 @@ module Raft
   end
 
   bloom :vote_counting do
-    #stdio <~ [["begin vote_counting"]]
     # if we discover our term is stale, step down to follower and update our term
     possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
@@ -89,17 +88,16 @@ module Raft
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
     end
     # store votes granted in the current term
-    votes_granted_in_current_term <+ (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
+    votes_granted_in_current_term <= (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
+      puts 'here'
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    #stdio <~ [['check for consensus']]
     possible_server_states <= (server_state * votes_granted_in_current_term).pairs do |s, v|
       #puts votes_granted_in_current_term.count
+      puts 'here'
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
-    #stdio <~ possible_server_states.inspected
-    #stdio <~ [["end vote_counting"]]
   end
 
   bloom :vote_casting do
@@ -140,7 +138,8 @@ module Raft
     # set timer to be 100-500 ms
     single_reset <= should_reset_timer.argagg(:choose, [], :reset)
     # TODO: set_alarm still gives duplicate key errors... wtf????
-    #stdio <~ timer.set_alarm.inspected
+    #timer.del_alarm <= single_reset {|s| ['election']}
+    #timer.set_alarm <= single_reset {|s| ['election', 100 + rand(400)]}
     timer.set_alarm <= single_reset {|s| [budtime, 100 + rand(400)]}
   end
 

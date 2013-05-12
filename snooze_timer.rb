@@ -29,6 +29,7 @@ module SnoozeTimer
 
   bloom do
     buffer <= set_alarm
+    stdio <~ buffer.inspected
     cyc <= (buffer * timer).pairs {|b, t| [t.val.to_f, b.time_out]}
     # have to do a max on this because timer may have multiple elements for some reason
     # and we only want a single row
