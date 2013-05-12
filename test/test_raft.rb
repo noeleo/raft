@@ -67,7 +67,7 @@ class TestRaft < Test::Unit::TestCase
 
     # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
-    (1..1000).each { 
+    (1..100).each { 
       listOfServers.each {|s| s.sync_do } 
     }
     #puts p1.methods
