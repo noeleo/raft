@@ -76,12 +76,11 @@ class TestRaft < Test::Unit::TestCase
     arrayOfStates = []
     listOfServers.map {|server| 
         server.states.values.map{ |vals|
-            arrayOfStates << vals[0]
+            arrayOfStates <<  vals[0]
         }
     }
-    
     assert arrayOfStates.any?{|str| str == "leader"}
-    
+
     # TEST : test that there is exactly one leader
     assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
 
