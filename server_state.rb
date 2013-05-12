@@ -20,7 +20,6 @@ module ServerState
   end
 
   bloom :manage_state do
-    stdio <~ possible_server_states.inspected
     temp :reordered <= possible_server_states do |s|
       [STATE_TO_ORDER[s.state]]
     end

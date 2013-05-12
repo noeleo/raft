@@ -48,7 +48,7 @@ module Raft
     scratch :should_reset_timer, [] => [:reset]
     scratch :single_reset, [] => [:reset]
 
-    periodic :heartbeat, 0.01
+    periodic :heartbeat, 0.1
   end
 
   bootstrap do
@@ -58,7 +58,7 @@ module Raft
     server_state <= [['follower']]
     current_term <= [[1]]
     # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <= [[budtime, 100]]
+    timer.set_alarm <= [[budtime, 100 + rand(100)]]
   end
 
   bloom :timeout do
@@ -76,6 +76,11 @@ module Raft
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0]
     end
+    # TODO: send out requests if you are a candidate, with a heartbeat
+    request_vote_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+      # TODO: put actual indicies in here after we implement logs
+      [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate'
+    end
   end
 
   # TODO: this might need to be done if we have to continually send if we don't get response
@@ -89,13 +94,18 @@ module Raft
     end
     max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
+    # TODO: is_granted will always be true in votes now because we send out requests all the time if
+    # we are a candidate
     votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
-      [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
+      puts s.state == 'candidate'
+      [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term and v.is_granted
     end
     # store votes granted in the current term
     votes_granted_in_current_term <= (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
       [v.from] if s.state == 'candidate' and v.is_granted
     end
+    #stdio <~ current_term {|t| [t.term]}
+    #stdio <~ [[votes_granted_in_current_term.count]]
     # if we have the majority of votes, then we are leader
     possible_server_states <= (server_state * votes_granted_in_current_term).pairs do |s, v|
       #puts votes_granted_in_current_term.count
@@ -132,10 +142,10 @@ module Raft
   end
 
   bloom :send_heartbeats do
-    append_entries_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+    #append_entries_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
       # TODO: add legit indicies when we do logging
-      [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
-    end
+    #  [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
+    #end
   end
 
   # if the timer should be reset, reset it here
@@ -145,7 +155,7 @@ module Raft
     # TODO: set_alarm still gives duplicate key errors... wtf????
     #timer.del_alarm <= single_reset {|s| ['election']}
     #timer.set_alarm <= single_reset {|s| ['election', 100 + rand(400)]}
-    timer.set_alarm <= single_reset {|s| [budtime, 100]}
+    timer.set_alarm <= single_reset {|s| [budtime, 100 + rand(100)]}
   end
 
   # take the max of all the possible terms and set that as the current term
