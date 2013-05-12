@@ -94,13 +94,11 @@ module Raft
     end
     # store votes granted in the current term
     votes_granted_in_current_term <= (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
-      puts 'here'
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
     possible_server_states <= (server_state * votes_granted_in_current_term).pairs do |s, v|
       #puts votes_granted_in_current_term.count
-      puts 'here'
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
   end
