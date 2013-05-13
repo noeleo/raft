@@ -1,8 +1,10 @@
-Raft Consensus (Leader Election) Protocol in Bud
-================================================
-Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley. For CS 194: Distributed System, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor for the Raft Protocol.
+Raft Consensus (Leader Election) Algorithm in Bud
+=================================================
+Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley. For CS 194: Distributed System, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
 
 ## Raft
+This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby.
+
 Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:
 `[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`
 Then, to run the code, something like this should be done:
@@ -52,7 +54,8 @@ SnoozeTimer Module State
     periodic :timer, 0.1
 ```
 
-## Tests
+Tests
+-----
 Test Cases to put in
 
 NOTE: Timeout depends on proc speed. Noel's comp is 100 + rand(100) 2.26GHZ core 2 duo
@@ -84,3 +87,10 @@ Test: Split Vote?
 -election is resolved even though there are ties
 
 Test: Term is incremented when new election starts
+
+References
+----------
+The Bloom Language (http://www.bloom-lang.net/)  
+Bud (https://github.com/bloom-lang/bud/)  
+"In Search of an Understandable Consensus Algorithm" (https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf)  
+Raft User Study (http://raftuserstudy.s3-website-us-west-1.amazonaws.com/study/)
