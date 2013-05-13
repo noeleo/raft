@@ -18,7 +18,7 @@ class RealRaft
 
   bloom do
     states <= (current_state * current_term).pairs {|s, t| [budtime, s.state, t.term]}
-    stdio <~ current_state.inspected
+    #stdio <~ current_state.inspected
     #stdio <~ votes do |v|
     #    [v.term, v.from, v.is_granted] if v.from == ip_port
     #end
@@ -37,7 +37,29 @@ class TestRaft < Test::Unit::TestCase
   end
 
   def test_start_off_as_follower
+    server = RealRaft.new(:port => 54320)
+    server.run_bg
+    # immediately check whether Raft instance starts as follower
+    assert server.current_state.values[0].first == 'follower'
+    server.stop
   end
+  
+#  def test_revert_to_follower
+#    server = RealRaft.new(:port => 54320)
+#    server.run_bg
+#    sleep 1
+#    # server should now be a candidate, term should be 2
+#    assert server.current_state.values[0].first == 'candidate'
+#    assert server.current_term.values[0].first == 2
+#    # send RPC with higher term to server
+#    server.append_entries_request <~ [['127.0.0.1:54320', '127.0.0.1:54321', 10, 0, 0, 0, 0]]
+#    sleep 3
+#    # server should now have updated its term and reverted to follower state
+#    puts "term: #{server.current_state.values[0].first}"
+#    assert server.current_state.values[0].first == 'follower'
+#    assert server.current_term.values[0].first == 10
+#    server.stop
+#  end
 
   def test_single_leader_elected
     cluster = create_cluster(5)

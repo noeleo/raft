@@ -106,7 +106,6 @@ module Raft
     end
     # if we have the majority of votes, then we are leader
     set_state <= (current_state * votes_granted_in_current_term).pairs do |s, v|
-      #puts votes_granted_in_current_term.count
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
   end
@@ -123,11 +122,7 @@ module Raft
     end
     voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
     vote_response <~ (vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
-      if r.from == v.candidate and voted_for_in_current_term.count == 0
-        [r.from, ip_port, t.term, true]
-      else
-        [r.from, ip_port, t.term, false]
-      end
+      [r.from, ip_port, t.term, (r.from == v.candidate and voted_for_in_current_term.count == 0)]
     end
     should_reset_timer <= (vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       [true] if r.from == v.candidate and not voted_for_in_current_term.exists?
@@ -151,7 +146,6 @@ module Raft
     end
     # reset our timer if the term is current or our term is stale
     should_reset_timer <= (append_entries_request * current_term).pairs do |a, t|
-      #puts 'hi'
       [true] if a.term >= t.term
     end
     # update term if our term is stale
