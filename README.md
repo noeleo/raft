@@ -1,5 +1,5 @@
-Raft Consensus Protocol in Bud
-==============================
+Raft Consensus (Leader Election) Protocol in Bud
+================================================
 Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley. For CS 194: Distributed System, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor for the Raft Protocol.
 
 ## Raft
