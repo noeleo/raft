@@ -1,7 +1,6 @@
 require 'rubygems'
 require 'bud'
 require 'snooze_timer'
-require 'progress_timer'
 require 'membership'
 require 'server_state'
 
@@ -12,7 +11,9 @@ module Raft
   include RaftProtocol
   include ServerState
   import SnoozeTimer => :timer
-  #import ProgressTimer => :timer
+
+  TIMEOUT_MIN = 300
+  TIMEOUT_MAX = 800
 
   def set_cluster(cluster)
     @HOSTS = cluster - [[ip_port]]
@@ -21,8 +22,8 @@ module Raft
   state do
     # see Figure 2 in Raft paper to see definitions of RPCs
     # TODO: do we need from field in responses?
-    channel :request_vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
-    channel :request_vote_response, [:@dest, :from, :term, :is_granted]
+    channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
+    channel :vote_response, [:@dest, :from, :term, :is_granted]
     channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :request_entry, :commit_index]
     channel :append_entries_response, [:@dest, :from, :term, :is_success]
 
@@ -54,13 +55,13 @@ module Raft
     members <= @HOSTS
     server_state <= [['follower']]
     current_term <= [[1]]
-    # start the timer with random timeout between 100-500 ms
-    timer.set_alarm <= [[budtime, 100 + rand(100)]]
+    # start the timer
+    timer.set_alarm <= [[TIMEOUT_MIN + rand(TIMEOUT_MAX-TIMEOUT_MIN)]]
   end
 
   bloom :timeout do
     # increment current term
-    current_term <+- (timer.alarm * server_state * current_term).combos do |a, s, t|
+    max_term <= (timer.alarm * server_state * current_term).combos do |a, s, t|
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
@@ -68,7 +69,7 @@ module Raft
       ['candidate'] if s.state != 'leader'
     end
     stdio <~ server_state do |s|
-      puts "#{ip_port[-1]} is now a #{s.state} in term #{current_term.first.term}"
+      #puts "#{ip_port} is now a #{s.state} in term #{current_term.first.term}"
       [s]
     end
     # vote for yourself
@@ -80,7 +81,7 @@ module Raft
       [true] if s.state != 'leader'
     end
     # send out request vote RPCs
-    request_vote_request <~ (timer.alarm * members * server_state * current_term).combos do |a, m, s, t|
+    vote_request <~ (timer.alarm * members * server_state * current_term).combos do |a, m, s, t|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0] if s.state != 'leader'
     end
@@ -88,7 +89,7 @@ module Raft
 
   # send out requests if you are a candidate, with a heartbeat
   bloom :wait_for_vote_responses do
-    request_vote_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+    vote_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate'
     end
@@ -96,14 +97,15 @@ module Raft
 
   bloom :vote_counting do
     # if we discover our term is stale, step down to follower and update our term
-    possible_server_states <= (server_state * request_vote_response * current_term).combos do |s, v, t|
+    possible_server_states <= (server_state * vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
-    max_term <= request_vote_response.argmax([:term], :term) {|v| [v.term]}
+    #stdio <~ vote_response.inspected
+    max_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
     # TODO: is_granted will always be true in votes now because we send out requests all the time if
     # we are a candidate
-    votes <= (server_state * request_vote_response * current_term).combos do |s, v, t|
+    votes <= (server_state * vote_response * current_term).combos do |s, v, t|
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term and v.is_granted
     end
     # store votes granted in the current term
@@ -122,23 +124,23 @@ module Raft
   bloom :vote_casting do
     #stdio <~ [["begin vote_casting"]]
     # if we discover our term is stale, step down to follower and update our term
-    possible_server_states <= (server_state * request_vote_request * current_term).combos do |s, v, t|
+    possible_server_states <= (server_state * vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
-    max_term <= request_vote_request.argmax([:term], :term) {|v| [v.term]}
+    max_term <= vote_request.argmax([:term], :term) {|v| [v.term]}
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs do |v, t|
       [v.candidate] if v.term == t.term
     end
-    voted_for_in_current_step <= request_vote_request.argagg(:choose, [], :from) {|v| [v.from]}
-    request_vote_response <~ (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+    voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
+    vote_response <~ (vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       if r.from == v.candidate and voted_for_in_current_term.count == 0
         [r.from, ip_port, t.term, true]
       else
         [r.from, ip_port, t.term, false]
       end
     end
-    should_reset_timer <= (request_vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
+    should_reset_timer <= (vote_request * voted_for_in_current_step * current_term).combos do |r, v, t|
       [true] if r.from == v.candidate and not voted_for_in_current_term.exists?
     end
     voted_for <+ (voted_for_in_current_step * current_term).pairs do |v, t|
@@ -155,11 +157,15 @@ module Raft
   end
 
   bloom :respond_to_append_entries do
+    # revert to follower if we get an append_entries_request
+    possible_server_states <= (server_state * append_entries_request * current_term).combos do |s, v, t|
+      ['follower'] if (s.state == 'candidate' and v.term >= t.term) or (s.state == 'leader' and v.term > t.term)
+    end
     # reset our timer if the term is current or our term is stale
-    #should_reset_timer <= (append_entries_request * current_term).pairs do |a, t|
+    should_reset_timer <= (append_entries_request * current_term).pairs do |a, t|
       #puts 'hi'
-    #  [true] if a.term >= t.term
-    #end
+      [true] if a.term >= t.term
+    end
     # update term if our term is stale
     #max_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
     # TODO: step down as leader if our term is stale
@@ -169,12 +175,12 @@ module Raft
 
   # if the timer should be reset, reset it here
   bloom :reset_timer do
-    # set timer to be 100-500 ms
+    # set timer
     single_reset <= should_reset_timer.argagg(:choose, [], :reset)
     # TODO: set_alarm still gives duplicate key errors... wtf????
     #timer.del_alarm <= single_reset {|s| ['election']}
     #timer.set_alarm <= single_reset {|s| ['election', 100 + rand(400)]}
-    timer.set_alarm <= single_reset {|s| [budtime, 100 + rand(100)]}
+    timer.set_alarm <= single_reset {|s| [TIMEOUT_MIN + rand(TIMEOUT_MAX-TIMEOUT_MIN)]}
   end
 
   # take the max of all the possible terms and set that as the current term

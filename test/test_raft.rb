@@ -67,18 +67,21 @@ class TestRaft < Test::Unit::TestCase
     #TEST CASE 1: Make Sure Each Node starts off as a follower
     # TODO: this is NOT going to work. it bootstraps by sending everyone messages and the whole process begins immediately
     listOfServers = [p1, p2, p3, p4, p5]
-    listOfServers.each do |server|
-      server.tick
+    #listOfServers.each do |server|
+    #  server.tick
       #server.sync_do do 
         #assert_equal(["follower"], server.server_state.values[0][0])
       #end
-    end
+    #end
 
     # TEST : test that a leader is initially elected
     # tick servers and assume normal operation
-    (1..100).each {
-      listOfServers.each {|s| s.sync_do } 
-    }
+    #(1..100).each {
+    #  listOfServers.each {|s| s.sync_do } 
+    #}
+    sleep 10
+    p1.stop
+    sleep 10
     #puts p1.methods
     #listOfServers.map{|s| puts s.server_state.values[0]}
     #puts p1.state.inspected
