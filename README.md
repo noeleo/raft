@@ -1,4 +1,4 @@
-Raft Consensus (Leader Election) Algorithm in Bud
+Raft Consensus Algorithm in Bud
 =================================================
 Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University of California, Berkeley. For CS 194: Distributed System, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
 
@@ -27,14 +27,14 @@ server states: follower, candidate, leader.
 
 ServerStateProtocol Input Interfaces
 ```ruby 
-    interface :input, :set_state, [:state]
-    interface :input, :set_term, [:term]
+interface :input, :set_state, [:state]
+interface :input, :set_term, [:term]
 ```
 
 ServerState Module Tables
 ```ruby
-    table :current_state, [] => [:state]
-    table :current_term, [] => [:term]
+table :current_state, [] => [:state]
+table :current_term, [] => [:term]
 ```
 
 ### Snooze Timer
@@ -44,14 +44,14 @@ There is only a single timer.
 
 SnoozeTimerProtocol Input Interfaces
 ```ruby
-    interface :input, :set_alarm, [] => [:time_out]
-    interface :output, :alarm, [] => [:time_out]
+interface :input, :set_alarm, [] => [:time_out]
+interface :output, :alarm, [] => [:time_out]
 ```
 SnoozeTimer Module State
 ```ruby
-    table :timer_state, [] => [:start_time, :time_out]
-    scratch :buffer, timer_state.schema
-    periodic :timer, 0.1
+table :timer_state, [] => [:start_time, :time_out]
+scratch :buffer, timer_state.schema
+periodic :timer, 0.1
 ```
 
 Tests
@@ -90,7 +90,7 @@ Test: Term is incremented when new election starts
 
 References
 ----------
-The Bloom Language (http://www.bloom-lang.net/)  
-Bud (https://github.com/bloom-lang/bud/)  
-"In Search of an Understandable Consensus Algorithm" (https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf)  
-Raft User Study (http://raftuserstudy.s3-website-us-west-1.amazonaws.com/study/)
+*The Bloom Language (http://www.bloom-lang.net/)
+*Bud (https://github.com/bloom-lang/bud/)
+*"In Search of an Understandable Consensus Algorithm" (https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf)
+*Raft User Study (http://raftuserstudy.s3-website-us-west-1.amazonaws.com/study/)
