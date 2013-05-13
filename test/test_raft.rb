@@ -61,7 +61,7 @@ class TestRaft < Test::Unit::TestCase
     assert servers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
     # if we kill the leader, then a new one should be elected
     leader_index = servers.map {|s| s.server_state.values[0].first }.index('leader')
-    servers[leader].stop
+    servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
     servers.each {|s| s.stop}

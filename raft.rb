@@ -1,7 +1,6 @@
 require 'rubygems'
 require 'bud'
 require 'snooze_timer'
-require 'membership'
 require 'server_state'
 
 module RaftProtocol
@@ -25,8 +24,6 @@ module Raft
   end
 
   state do
-    # see Figure 2 in Raft paper to see definitions of RPCs
-    # TODO: do we need from field in responses?
     channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
     channel :vote_response, [:@dest, :from, :term, :is_granted]
     channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :request_entry, :commit_index]
@@ -35,9 +32,6 @@ module Raft
     # all of the members in the system, host is respective ip_port
     table :members, [:host]
     table :leader, [] => [:host]
-    table :current_term, [] => [:term]
-    scratch :max_term, [:term]
-    scratch :single_max_term, [] => [:term]
     # server we voted for in current term
     table :voted_for, [:term] => [:candidate]
     scratch :voted_for_in_current_term, [] => [:candidate]
@@ -58,14 +52,13 @@ module Raft
     # add all the members of the system except yourself
     # TODO: create mechanism to add all members programatically
     members <= @HOSTS
-    current_term <= [[1]]
     # start the timer
     timer.set_alarm <= [[random_timeout]]
   end
 
   bloom :timeout do
     # increment current term
-    max_term <= (timer.alarm * server_state * current_term).combos do |a, s, t|
+    set_term <= (timer.alarm * server_state * current_term).combos do |a, s, t|
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
@@ -100,7 +93,7 @@ module Raft
     set_server_state <= (server_state * vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
-    max_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
+    set_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
     # TODO: is_granted will always be true in votes now because we send out requests all the time if
     # we are a candidate
@@ -123,7 +116,7 @@ module Raft
     set_server_state <= (server_state * vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
-    max_term <= vote_request.argmax([:term], :term) {|v| [v.term]}
+    set_term <= vote_request.argmax([:term], :term) {|v| [v.term]}
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * current_term).pairs do |v, t|
       [v.candidate] if v.term == t.term
@@ -162,7 +155,7 @@ module Raft
       [true] if a.term >= t.term
     end
     # update term if our term is stale
-    max_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
+    set_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
     # TODO: step down as leader if our term is stale
     # TODO: respond to append entries
     # TODO: update leader if we get an append entries (and if we are leader, only if our term is stale)
@@ -171,12 +164,5 @@ module Raft
   bloom :reset_timer do
     single_reset <= should_reset_timer.argagg(:choose, [], :reset)
     timer.set_alarm <= single_reset {|s| [random_timeout]}
-  end
-
-  bloom :set_current_term do
-    single_max_term <= max_term.argagg(:max, [], :term)
-    current_term <+- (single_max_term * current_term).pairs do |m, c|
-      [m.term] if m.term > c.term
-    end
   end
 end
