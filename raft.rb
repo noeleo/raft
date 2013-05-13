@@ -58,23 +58,23 @@ module Raft
 
   bloom :timeout do
     # increment current term
-    set_term <= (timer.alarm * server_state * current_term).combos do |a, s, t|
+    set_term <= (timer.alarm * current_state * current_term).combos do |a, s, t|
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
-    set_server_state <= (timer.alarm * server_state).pairs do |t, s|
+    set_state <= (timer.alarm * current_state).pairs do |t, s|
       ['candidate'] if s.state != 'leader'
     end
     # vote for yourself
-    votes <= (timer.alarm * server_state * current_term).combos do |a,s,t|
+    votes <= (timer.alarm * current_state * current_term).combos do |a,s,t|
       [t.term, ip_port, true] if s.state != 'leader'
     end
     # reset the alarm
-    should_reset_timer <= (timer.alarm * server_state).pairs do |a|
+    should_reset_timer <= (timer.alarm * current_state).pairs do |a|
       [true] if s.state != 'leader'
     end
     # send out request vote RPCs
-    vote_request <~ (timer.alarm * members * server_state * current_term).combos do |a, m, s, t|
+    vote_request <~ (timer.alarm * members * current_state * current_term).combos do |a, m, s, t|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0] if s.state != 'leader'
     end
@@ -82,7 +82,7 @@ module Raft
 
   # send out requests if you are a candidate, with a heartbeat
   bloom :wait_for_vote_responses do
-    vote_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+    vote_request <~ (current_state * members * current_term * heartbeat).combos do |s, m, t, h|
       # TODO: put actual indicies in here after we implement logs
       [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate'
     end
@@ -90,22 +90,22 @@ module Raft
 
   bloom :vote_counting do
     # if we discover our term is stale, step down to follower and update our term
-    set_server_state <= (server_state * vote_response * current_term).combos do |s, v, t|
+    set_state <= (current_state * vote_response * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     set_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
     # TODO: is_granted will always be true in votes now because we send out requests all the time if
     # we are a candidate
-    votes <= (server_state * vote_response * current_term).combos do |s, v, t|
+    votes <= (current_state * vote_response * current_term).combos do |s, v, t|
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term and v.is_granted
     end
     # store votes granted in the current term
-    votes_granted_in_current_term <= (server_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
+    votes_granted_in_current_term <= (current_state * votes * current_term).combos(votes.term => current_term.term) do |s, v, t|
       [v.from] if s.state == 'candidate' and v.is_granted
     end
     # if we have the majority of votes, then we are leader
-    set_server_state <= (server_state * votes_granted_in_current_term).pairs do |s, v|
+    set_state <= (current_state * votes_granted_in_current_term).pairs do |s, v|
       #puts votes_granted_in_current_term.count
       ['leader'] if s.state == 'candidate' and votes_granted_in_current_term.count > (members.count/2)
     end
@@ -113,7 +113,7 @@ module Raft
 
   bloom :vote_casting do
     # if we discover our term is stale, step down to follower and update our term
-    set_server_state <= (server_state * vote_request * current_term).combos do |s, v, t|
+    set_state <= (current_state * vote_request * current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
     end
     set_term <= vote_request.argmax([:term], :term) {|v| [v.term]}
@@ -138,7 +138,7 @@ module Raft
   end
 
   bloom :send_heartbeats do
-    append_entries_request <~ (server_state * members * current_term * heartbeat).combos do |s, m, t, h|
+    append_entries_request <~ (current_state * members * current_term * heartbeat).combos do |s, m, t, h|
        # TODO: add legit indicies when we do logging
       [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
     end
@@ -146,7 +146,7 @@ module Raft
 
   bloom :respond_to_append_entries do
     # revert to follower if we get an append_entries_request
-    set_server_state <= (server_state * append_entries_request * current_term).combos do |s, v, t|
+    set_state <= (current_state * append_entries_request * current_term).combos do |s, v, t|
       ['follower'] if (s.state == 'candidate' and v.term >= t.term) or (s.state == 'leader' and v.term > t.term)
     end
     # reset our timer if the term is current or our term is stale

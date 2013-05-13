@@ -17,8 +17,8 @@ class RealRaft
   end
 
   bloom do
-    states <= (server_state * current_term).pairs {|s, t| [budtime, s.state, t.term]}
-    stdio <~ server_state.inspected
+    states <= (current_state * current_term).pairs {|s, t| [budtime, s.state, t.term]}
+    stdio <~ current_state.inspected
     #stdio <~ votes do |v|
     #    [v.term, v.from, v.is_granted] if v.from == ip_port
     #end
@@ -58,9 +58,9 @@ class TestRaft < Test::Unit::TestCase
     # a leader should have been chosen
     assert all_states.any?{|st| st == "leader"}
     # a single leader should have been chosen and converged
-    assert servers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    assert servers.map {|s| s.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
     # if we kill the leader, then a new one should be elected
-    leader_index = servers.map {|s| s.server_state.values[0].first }.index('leader')
+    leader_index = servers.map {|s| s.current_state.values[0].first }.index('leader')
     servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
@@ -68,18 +68,18 @@ class TestRaft < Test::Unit::TestCase
   end
     ## TEST : test that when a leader goes offline, a new leader is elected
     ## find and stop the current leader:
-    #leader = listOfServers.select {|s| s.server_state.values[0].first == 'leader'}.first
+    #leader = listOfServers.select {|s| s.current_state.values[0].first == 'leader'}.first
     #leader.stop
     #listOfServers.delete(leader) # remove stopped server from listOfServers
     #(1..10).each { listOfServers.each {|s| s.sync_do } }
     ## now test that there is exactly one leader
-    ##assert listOfServers.map {|s| s.server_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    ##assert listOfServers.map {|s| s.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
     ##assert_equal(arrayOfStates.count('leader'),1)
     ## CLEAN UP: add leader back to listOfServers
     #listOfServers << leader
     ## TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term
     ## find a follower:
-    #follower = listOfServers.select {|s| s.server_state.values[0].first == 'leader'}.first
+    #follower = listOfServers.select {|s| s.current_state.values[0].first == 'leader'}.first
     #follower_term = follower.current_term.values[0].first
     ##send follower a vote request with term greater than its term
     #  # request_vote_request:
