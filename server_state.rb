@@ -14,13 +14,17 @@ module ServerState
     'c' => 'leader'
   }
 
+  bootstrap do
+    server_state <= [['follower']]
+  end
+
   state do
-    interface :input, :possible_server_states, [:state]
+    interface :input, :set_server_state, [:state]
     table :server_state, [] => [:state]
   end
 
   bloom :manage_state do
-    temp :reordered <= possible_server_states do |s|
+    temp :reordered <= set_server_state do |s|
       [STATE_TO_ORDER[s.state]]
     end
     temp :final_state <= reordered.argagg(:min, [], :state)
