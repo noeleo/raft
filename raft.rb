@@ -1,7 +1,8 @@
 require 'rubygems'
 require 'bud'
-require 'snooze_timer'
+
 require 'server_state'
+require 'snooze_timer'
 
 module RaftProtocol
 end
