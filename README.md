@@ -78,6 +78,8 @@ The test suite for the Server State module is in test_server_state.rb. These tes
 The test suite for RAFT Leader Election is in test_raft.rb. The test tests the following case:
   1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected. If we kill the leader, then another one should be elected. 
 
+### Tests that need to be added (will be deleted once done) 
+
 Test: Term Incrementing
 -Terms are sent with every RPC
 Test A: If RPC Sender Term is stale, receiver should respond with its term
