@@ -60,13 +60,19 @@ at 100 + rand (100) [in the range of 100 to 200 ms]. Should you have a slower pr
 increase the timeout; if you have a faster processor you will need to decrease the timeout. 
 
 ### Timer Tests
-The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following 
-cases:
+The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following cases:
   1. Testing the Alarm Going Off: A timer is set for 3 seconds. We check to see whether a timer does not go off within a second of setting the timer on. 3.5 seconds after turning on the timer we check to see that it has gone off.
   2. Testing Multiple Timers: We create 2 timers with 3 seconds each. We check to see that both alarms go off after 3 seconds of creation.
   3. Testing Reset of Alarms: We set an alarm for 3 seconds. We wait for 1.5 seconds and make sure the alarm does not go off. We then reset the alarm and make sure it goes off 3.5 seconds of the alarm going off
   4. Test Multiple Timers at Same Tick: We set a timer for 3 seconds. We wait 4 seconds to make surethe timer goes off.
 
+### Server State Tests
+The test suite for the Server State module is in test_server_state.rb. These tests test the following cases:
+  1. Test one Server State: We create a cluster and set it's state as a candidate. We then tick it to see that the server state should change.  We then check to see that the state of the server is candidate.
+  2. Test Tie Braking: We create a cluster and insert 3 states (candidate, leader, follower). We then tick the time state and check to see that the server is demoted to follower.
+  3. Test Duplicate States: We create a cluster and insert 3 states (leader, leader, candidate). After a tick, we check to see that the server is demoted to candidate.
+  4. Test Multiple Calls: We create a cluster and first set states as leader, leader. Then after a tick we set the states as follower and candidate. We check to see that one server is the leader and after a tick it becomes a follower. 
+  5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3 instead of 2.
 Test: Term Incrementing
 -Terms are sent with every RPC
 
