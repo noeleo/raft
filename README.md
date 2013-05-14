@@ -53,11 +53,11 @@ periodic :timer, 0.1
 
 Tests
 -----
-Test Cases to put in
+Unit tests to test the Leader Election Implementation of RAFT in Bud are located in the /test directory.
 
-NOTE: Timeout depends on proc speed. Noel's comp is 100 + rand(100) 2.26GHZ core 2 duo
-if your proc is slower increase timeout
-if faster decrease timeout
+NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 Duo, the timeout is benchmarked
+at 100 + rand (100) [in the range of 100 to 200 ms]. Should you have a slower processor you will need to
+increase the timeout; if you have a faster processor you will need to decrease the timeout. 
 
 Test: Term Incrementing
 -Terms are sent with every RPC
