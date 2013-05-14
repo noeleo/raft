@@ -5,8 +5,8 @@ Noel Moldvai, Rohit Turumella, James Butkovic, Josh Muhlfelder at the University
 ## Raft
 This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud.
 
-Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:
-`[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`
+Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:  
+`[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`  
 Then, to run the code, something like this should be done:
 ```ruby
 cluster = [['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]
@@ -24,7 +24,7 @@ We have decomposed some elements of our implementation into modules that can sta
 The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader) and the monotonically increasing current term.
 
 ServerStateProtocol Input Interfaces
-```ruby 
+```ruby
 interface :input, :set_state, [:state]
 interface :input, :set_term, [:term]
 ```
@@ -36,8 +36,8 @@ table :current_term, [] => [:term]
 ```
 
 ### Snooze Timer
-The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the 
-set_alarm input interface and having it go off via the alarm output. If another set_alarm is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
+The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the
+`set_alarm` input interface and having it go off via the `alarm` output. If another `set_alarm` is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
 
 SnoozeTimerProtocol Input Interfaces
 ```ruby
@@ -79,7 +79,7 @@ should be followers
 
 Test: If ElectionTimeout elapses with no RPCS, new election starts
 
-Test: Split Vote? 
+Test: Split Vote?
 -2 servers, each vote for each other
 -election is resolved even though there are ties
 
