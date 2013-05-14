@@ -111,3 +111,4 @@ References
 * Bud (https://github.com/bloom-lang/bud/)
 * "In Search of an Understandable Consensus Algorithm" (https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf)
 * Raft User Study (http://raftuserstudy.s3-website-us-west-1.amazonaws.com/study/)
+* Thanks to Diego Ongaro from Stanford for mentoring. 
