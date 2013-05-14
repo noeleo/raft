@@ -7,11 +7,10 @@ Raft Consensus Algorithm in Bud
 * James Butkovic
 * Josh Muhlfelder
 
-For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
+For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.  
+This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud, explained in the sections below.
 
 ## Raft
-This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud.
-
 Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:  
 `[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`  
 Then, to run the code, something like this should be done:
@@ -22,6 +21,11 @@ r.set_cluster(cluster)
 r.run_bg
 ```
 An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.
+
+## Leader Election
+Leader election works essentially as described in the Raft paper. When servers start up, they begin as followers and listen for any RequestVote and AppendEntries RPCs. If they receive none within a certain period of time (the timeout), then they begin an election, restart their timer, increment their term, and transition to the candidate state. Here, they send out RequestVote RPCs to all other servers every 100ms. This differs from Raft as described in the paper in that once a response is given from a server, it stops asking for requests. Our implementation is simpler, but does increase network traffic.  
+When a response is received, it is stored if the terms of both the sender and receiver are equal, and once a majority of votes are received (we count our vote for ourself), a new leader is born. This is announced by sending empty AppendEntries RPCs to everyone else, and normal operation resumes. We only store granted votes, since it should be the voter's responsibility to ensure that they only vote for one candidate in a single term.  
+In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
 
 Modules
 -------
@@ -43,8 +47,7 @@ table :current_term, [] => [:term]
 ```
 
 ### Snooze Timer
-The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the
-`set_alarm` input interface and having it go off via the `alarm` output. If another `set_alarm` is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
+The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the `set_alarm` input interface and having it go off via the `alarm` output. If another `set_alarm` is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
 
 SnoozeTimerProtocol Input Interfaces
 ```ruby
@@ -68,7 +71,7 @@ NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 D
 The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following cases:
   1. Testing the Alarm Going Off: A timer is set for 3 seconds. We check to see whether a timer does not go off within a second of setting the timer on. 3.5 seconds after turning on the timer we check to see that it has gone off.
   2. Testing Multiple Timers: We create 2 timers with 3 seconds each. We check to see that both alarms go off after 3 seconds of creation.
-  3. Testing Reset of Alarms: We set an alarm for 3 seconds. We wait for 1.5 seconds and make sure the alarm does not go off. We then reset the alarm and make sure it goes off 3.5 seconds of the alarm going off
+  3. Testing Reset of Alarms: We set an alarm for 3 seconds. We wait for 1.5 seconds and make sure the alarm does not go off. We then reset the alarm and make sure it goes off 3.5 seconds of the alarm going off.
   4. Test Multiple Timers at Same Tick: We set a timer for 3 seconds. We wait 4 seconds to make surethe timer goes off.
 
 ### Server State Tests
@@ -77,13 +80,15 @@ The test suite for the Server State module is in test_server_state.rb. These tes
   2. Test Tie Braking: We create a cluster and insert 3 states (candidate, leader, follower). We then tick the time state and check to see that the server is demoted to follower.
   3. Test Duplicate States: We create a cluster and insert 3 states (leader, leader, candidate). After a tick, we check to see that the server is demoted to candidate.
   4. Test Multiple Calls: We create a cluster and first set states as leader, leader. Then after a tick we set the states as follower and candidate. We check to see that one server is the leader and after a tick it becomes a follower. 
-  5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3 instead of 2.
+  5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3, the max of the current term (1) and the other term we are trying to set (2).
 
 ### RAFT Leader Election Tests
 The test suite for RAFT Leader Election is in test_raft.rb. The test tests the following case:
-  1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected. If we kill the leader, then another one should be elected. 
+  1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected.
+  2. Test Leader Failure: If we kill the leader, then another one should be elected.
+  3. Test Killing Maximum Number of Servers: Start a cluster of 5 servers, then immediately kill 2 of them. A leader should still be elected.
 
-### Tests that need to be added (will be deleted once done) 
+## Tests that need to be added (will be deleted once done) 
 
 Test: Term Incrementing
 -Terms are sent with every RPC
