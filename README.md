@@ -59,6 +59,14 @@ NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 D
 at 100 + rand (100) [in the range of 100 to 200 ms]. Should you have a slower processor you will need to
 increase the timeout; if you have a faster processor you will need to decrease the timeout. 
 
+Timer Tests
+The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following 
+cases:
+  1. Testing the Alarm Going Off: A timer is set for 3 seconds. We check to see whether a timer does not go off within a second of setting the timer on. 3.5 seconds after turning on the timer we check to see that it has gone off.
+  2. Testing Multiple Timers: We create 2 timers with 3 seconds each. We check to see that both alarms go off after 3 seconds of creation.
+  3. Testing Reset of Alarms: We set an alarm for 3 seconds. We wait for 1.5 seconds and make sure the alarm does not go off. We then reset the alarm and make sure it goes off 3.5 seconds of the alarm going off
+  4. Test Multiple Timers at Same Tick: We set a timer for 3 seconds. We wait 4 seconds to make surethe timer goes off.
+
 Test: Term Incrementing
 -Terms are sent with every RPC
 
