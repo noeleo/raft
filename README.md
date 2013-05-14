@@ -59,7 +59,7 @@ NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 D
 at 100 + rand (100) [in the range of 100 to 200 ms]. Should you have a slower processor you will need to
 increase the timeout; if you have a faster processor you will need to decrease the timeout. 
 
-## Timer Tests
+# Timer Tests
 The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following 
 cases:
   1. Testing the Alarm Going Off: A timer is set for 3 seconds. We check to see whether a timer does not go off within a second of setting the timer on. 3.5 seconds after turning on the timer we check to see that it has gone off.
