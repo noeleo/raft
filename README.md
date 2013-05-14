@@ -73,9 +73,13 @@ The test suite for the Server State module is in test_server_state.rb. These tes
   3. Test Duplicate States: We create a cluster and insert 3 states (leader, leader, candidate). After a tick, we check to see that the server is demoted to candidate.
   4. Test Multiple Calls: We create a cluster and first set states as leader, leader. Then after a tick we set the states as follower and candidate. We check to see that one server is the leader and after a tick it becomes a follower. 
   5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3 instead of 2.
+
+### RAFT Leader Election Tests
+The test suite for RAFT Leader Election is in test_raft.rb. The test tests the following case:
+  1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected. If we kill the leader, then another one should be elected. 
+
 Test: Term Incrementing
 -Terms are sent with every RPC
-
 Test A: If RPC Sender Term is stale, receiver should respond with its term
 and sender increase their term to the receiver's, and rever to follower state
 
