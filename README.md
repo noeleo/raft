@@ -1,16 +1,10 @@
 Raft Consensus Algorithm in Bud
 =================================================
-
-### Team at UC Berkeley:
-* Noel Moldvai
-* Rohit Turumella
-* James Butkovic
-* Josh Muhlfelder
-
-For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.  
 This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud, explained in the sections below.
 
-## Raft
+Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
+
+## Running a Raft Server
 Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:  
 `[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`  
 Then, to run the code, something like this should be done:
@@ -22,14 +16,16 @@ r.run_bg
 ```
 An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.
 
-## Leader Election
-Leader election works essentially as described in the Raft paper. When servers start up, they begin as followers and listen for any RequestVote and AppendEntries RPCs. If they receive none within a certain period of time (the timeout), then they begin an election, restart their timer, increment their term, and transition to the candidate state. Here, they send out RequestVote RPCs to all other servers every 100ms. This differs from Raft as described in the paper in that once a response is given from a server, it stops asking for requests. Our implementation is simpler, but does increase network traffic.  
-When a response is received, it is stored if the terms of both the sender and receiver are equal, and once a majority of votes are received (we count our vote for ourself), a new leader is born. This is announced by sending empty AppendEntries RPCs to everyone else, and normal operation resumes. We only store granted votes, since it should be the voter's responsibility to ensure that they only vote for one candidate in a single term.  
-In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
-
 Modules
 -------
 We have decomposed some elements of our implementation into modules that can stand alone and be tested in isolation.
+
+### Leader Election
+Leader election works essentially as described in the Raft paper. When servers start up, they begin as followers and listen for any RequestVote and AppendEntries RPCs. If they receive none within a certain period of time (the timeout), then they begin an election, restart their timer, increment their term, and transition to the candidate state. Here, they send out RequestVote RPCs to all other servers every 100ms. This differs from Raft as described in the paper in that once a response is given from a server, it stops asking for requests. Our implementation is simpler, but does increase network traffic.
+
+When a response is received, it is stored if the terms of both the sender and receiver are equal, and once a majority of votes are received (we count our vote for ourself), a new leader is born. This is announced by sending empty AppendEntries RPCs to everyone else, and normal operation resumes. We only store granted votes, since it should be the voter's responsibility to ensure that they only vote for one candidate in a single term.
+
+In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
 
 ### Server State
 The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader) and the monotonically increasing current term.
@@ -82,7 +78,7 @@ The test suite for the Server State module is in test_server_state.rb. These tes
   4. Test Multiple Calls: We create a cluster and first set states as leader, leader. Then after a tick we set the states as follower and candidate. We check to see that one server is the leader and after a tick it becomes a follower. 
   5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3, the max of the current term (1) and the other term we are trying to set (2).
 
-### RAFT Leader Election Tests
+### Leader Election Tests
 The test suite for RAFT Leader Election is in test_raft.rb. The test tests the following case:
   1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected.
   2. Test Leader Failure: If we kill the leader, then another one should be elected.
