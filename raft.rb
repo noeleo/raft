@@ -13,7 +13,7 @@ module Raft
   import VoteCounter => :vc
 
   def set_cluster(cluster)
-    @HOSTS = cluster - [[ip_port]]
+    @HOSTS = cluster
   end
 
   state do
@@ -31,9 +31,13 @@ module Raft
   end
 
   bootstrap do
-    members <= @HOSTS
+    members <= @HOSTS - [[ip_port]]
     st.reset_timer <= [[true]]
-    vc.setup <= [[@HOSTS.count]]#+1]]
+    vc.setup <= [[@HOSTS.count]]
+  end
+  
+  bloom :module_input do
+    vc.count_votes <= st.current_term {|t| [t.term]}
   end
 
   bloom :timeout do
@@ -49,22 +53,13 @@ module Raft
     st.reset_timer <= (st.alarm * st.current_state).pairs do |a|
       [true] if s.state != 'leader'
     end
-    vc.start_election <= st.current_term {|t| [t.term]}
-    vc.vote <= st.current_term {|t| [t.term, ip_port, true]}
-    #voted_for <= st.current_term {|t| [t.term, ip_port]}
-  end
-  
-  bloom :candidate_mode do
-    # start counting votes and vote for ourselves
-    #vc.start_election <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-    #  [t.term] if s.state != 'leader'
-    #end
-    #vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-    #  [t.term, ip_port, true] if s.state != 'leader'
-    #end
-    #voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-    #  [t.term, ip_port] if s.state != 'leader'
-    #end
+    # vote for ourselves
+    vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+      [t.term, ip_port, true] if s.state != 'leader'
+    end
+    voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+      [t.term, ip_port] if s.state != 'leader'
+    end
   end
 
   bloom :send_vote_requests do
@@ -86,6 +81,7 @@ module Raft
     end
     # if we won the election, then we become leader
     st.set_state <= (vc.election_won * st.current_state * st.current_term).combos do |e, s, t|
+      #puts "WON! port #{ip_port} e.term #{e.term} and t.term #{t.term}"
       ['leader'] if s.state == 'candidate' and e.term == t.term
     end
   end
