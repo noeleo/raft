@@ -57,9 +57,9 @@ module Raft
     vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
       [t.term, ip_port, true] if s.state != 'leader'
     end
-    #voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-    #  [t.term, ip_port] if s.state != 'leader'
-    #end
+    voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+      [t.term, ip_port] if s.state != 'leader'
+    end
   end
 
   bloom :send_vote_requests do
