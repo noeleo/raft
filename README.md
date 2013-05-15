@@ -84,30 +84,6 @@ The test suite for RAFT Leader Election is in test_raft.rb. The test tests the f
   2. Test Leader Failure: If we kill the leader, then another one should be elected.
   3. Test Killing Maximum Number of Servers: Start a cluster of 5 servers, then immediately kill 2 of them. A leader should still be elected.
 
-## Tests that need to be added (will be deleted once done) 
-
-Test: Term Incrementing
--Terms are sent with every RPC
-Test A: If RPC Sender Term is stale, receiver should respond with its term
-and sender increase their term to the receiver's, and rever to follower state
-
-Test B: If receiver term is stale, receiver reverts to follower and updates term to sender
-and processes RPC
-
-Test: Single Leader at a Time
-
--Nice to have: election should start when timeout on any other node expires
-
-Test: When leader is elected, it should send AppendEntries to all the other nodes continously. all non leader nodes
-should be followers
-
-Test: If ElectionTimeout elapses with no RPCS, new election starts
-
-Test: Split Vote?
--2 servers, each vote for each other
--election is resolved even though there are ties
-
-Test: Term is incremented when new election starts
 
 References
 ----------
