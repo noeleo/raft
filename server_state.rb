@@ -1,15 +1,29 @@
 require 'rubygems'
 require 'bud'
 
+require 'snooze_timer'
+
 module ServerStateProtocol
   state do
     interface :input, :set_state, [:state]
     interface :input, :set_term, [:term]
+    # reset should always be true
+    interface :input, :reset_timer, [] => [:reset]
+    interface :output, :alarm, [] => [:time_out]
   end
 end
 
 module ServerState
   include ServerStateProtocol
+  import SnoozeTimer => :timer
+  
+  # set timeouts in milliseconds
+  MIN_TIMEOUT = 300
+  MAX_TIMEOUT = 800
+  
+  def random_timeout
+    MIN_TIMEOUT + rand(MAX_TIMEOUT - MIN_TIMEOUT)
+  end
 
   STATE_TO_ORDER = {
     'follower' =>  'a',
@@ -47,5 +61,13 @@ module ServerState
     current_term <+- (final_term * current_term).pairs do |f, c|
       [f.term] if f.term > c.term
     end
+  end
+  
+  bloom :manage_timer do
+    # reset timer
+    temp :final_timer <= reset_timer.argagg(:choose, [], :reset)
+    timer.set_alarm <= final_timer {|t| [random_timeout]}
+    # set off alarm
+    alarm <= timer.alarm {|t| [t.time_out]}
   end
 end

@@ -1,11 +1,7 @@
 require 'rubygems'
 require 'bud'
-require 'time'
 
-# Progress Timer works by setting an alarm with a timeout via the set_alarm input 
-# interface and having it go off via the alarm output. If another set_alarm is
-# issued before the current alarm goes off, the alarm will be reset. There is only
-# a single timer.
+require 'time'
 
 module SnoozeTimerProtocol
   state do
