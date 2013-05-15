@@ -96,8 +96,6 @@ and processes RPC
 
 Test: Single Leader at a Time
 
-Test: If leader goes down, election should start, a new leader should be elected.
--5 servers, leader goes down, 1 of other 4 should be elected
 -Nice to have: election should start when timeout on any other node expires
 
 Test: When leader is elected, it should send AppendEntries to all the other nodes continously. all non leader nodes
