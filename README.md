@@ -21,40 +21,54 @@ Modules
 We have decomposed some elements of our implementation into modules that can stand alone and be tested in isolation.
 
 ### Leader Election
-Leader election works essentially as described in the Raft paper. When servers start up, they begin as followers and listen for any RequestVote and AppendEntries RPCs. If they receive none within a certain period of time (the timeout), then they begin an election, restart their timer, increment their term, and transition to the candidate state. Here, they send out RequestVote RPCs to all other servers every 100ms. This differs from Raft as described in the paper in that once a response is given from a server, it stops asking for requests. Our implementation is simpler, but does increase network traffic.
+Leader election works essentially as described in the Raft paper. When servers start up, they begin as followers and listen for any RequestVote and AppendEntries RPCs. If they receive none within a certain period of time (the timeout), then they begin an election, restart their timer, increment their term, and transition to the candidate state. Here, they send out RequestVote RPCs to all other servers every 100ms until a response is received.
 
-When a response is received, it is stored if the terms of both the sender and receiver are equal, and once a majority of votes are received (we count our vote for ourself), a new leader is born. This is announced by sending empty AppendEntries RPCs to everyone else, and normal operation resumes. We only store granted votes, since it should be the voter's responsibility to ensure that they only vote for one candidate in a single term.
+When a response is received, it is stored if the terms of both the sender and receiver are equal, and once a majority of votes are received (we count our vote for ourself), a new leader is born. This is announced by sending empty AppendEntries RPCs to everyone else, and normal operation resumes.
 
 In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
 
 ### Server State
-The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader) and the monotonically increasing current term.
+The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, and an interface for snoozing the timer/having the alarm go off.
 
-ServerStateProtocol Input Interfaces
+ServerStateProtocol Interface
 ```ruby
 interface :input, :set_state, [:state]
 interface :input, :set_term, [:term]
+interface :input, :reset_timer, [] => [:reset]
+interface :output, :alarm, [] => [:time_out]
 ```
 
-ServerState Module Tables
+The tables in ServerState should be "reached into" by the outer module to grab the state and term.  
+ServerState Module State
 ```ruby
 table :current_state, [] => [:state]
 table :current_term, [] => [:term]
 ```
 
+### Vote Counter
+The vote counter counts votes and alerts when an election has been won in the specified term. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority in the specified term passed in.
+
+VoteCounterProtocol Interface
+```ruby
+interface :input, :setup, [] => [:num_voters]
+interface :input, :count_votes, [] => [:term]
+interface :input, :vote, [:term, :candidate] => [:is_granted]
+interface :output, :election_won, [:term]
+```
+
+The `voted` table can be useful to see who has voted (either granted or not granted).  
+VoteCounter State
+```ruby
+table :voted, [:term, :candidate]
+```
+
 ### Snooze Timer
 The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the `set_alarm` input interface and having it go off via the `alarm` output. If another `set_alarm` is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
 
-SnoozeTimerProtocol Input Interfaces
+SnoozeTimerProtocol Interface
 ```ruby
 interface :input, :set_alarm, [] => [:time_out]
 interface :output, :alarm, [] => [:time_out]
-```
-SnoozeTimer Module State
-```ruby
-table :timer_state, [] => [:start_time, :time_out]
-scratch :buffer, timer_state.schema
-periodic :timer, 0.1
 ```
 
 Tests
