@@ -18,7 +18,7 @@ class RealRaft
 
   bloom do
     states <= (st.current_state * st.current_term).pairs {|s, t| [budtime, s.state, t.term]}
-    #stdio <~ st.current_state.inspected
+    stdio <~ st.current_state.inspected
   end
 end
 

@@ -25,75 +25,72 @@ class RealServerState
 end
 
 class TestServerState < Test::Unit::TestCase
-  def get_state(server)
-    server.current_state.values[0][0]
+  def setup
+    @st = RealServerState.new
+    @st.run_bg
+  end
+  
+  def teardown
+    @st.stop
+  end
+  
+  def get_state
+    @st.current_state.values[0][0]
   end
 
-  def get_term(server)
-    server.current_term.values[0][0]
+  def get_term
+    @st.current_term.values[0][0]
   end
 
   def test_one_server_state
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.set_state <+ [['candidate']] }
+    @st.sync_do { @st.set_state <+ [['candidate']] }
     # have to tick it since the server state should change on the next tick
-    server.tick
+    @st.tick
     # length should be 3: 1st is bootstrap, then sync, then update
-    assert_equal(3, server.states.length)
-    assert_equal('candidate', get_state(server))
+    assert_equal(3, @st.states.length)
+    assert_equal('candidate', get_state)
   end
 
   def test_tie_breaking
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.set_state <+ [['candidate'], ['leader'], ['follower']]}
-    server.tick
-    assert_equal(3, server.states.length)
-    assert_equal('follower', get_state(server))
+    @st.sync_do { @st.set_state <+ [['candidate'], ['leader'], ['follower']]}
+    @st.tick
+    assert_equal(3, @st.states.length)
+    assert_equal('leader', get_state)
   end
 
   def test_duplicate_states
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.set_state <+ [['candidate'], ['leader'], ['leader']]}
-    server.tick
-    assert_equal(3, server.states.length)
-    assert_equal('candidate', get_state(server))
+    @st.sync_do { @st.set_state <+ [['candidate'], ['leader'], ['leader']]}
+    @st.tick
+    assert_equal(3, @st.states.length)
+    assert_equal('leader', get_state)
   end
 
   def test_multiple_calls
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.set_state <+ [['leader'], ['leader']]}
+    @st.sync_do { @st.set_state <+ [['leader'], ['leader']]}
     # this will tick it so don't need to tick here
-    server.sync_do { server.set_state <+ [['follower'], ['candidate']]}
-    assert_equal(3, server.states.length)
-    assert_equal('leader', get_state(server))
+    @st.sync_do { @st.set_state <+ [['follower'], ['candidate']]}
+    assert_equal(3, @st.states.length)
+    assert_equal('leader', get_state)
     # now tick for the other delay to come in
-    server.tick
-    assert_equal(4, server.states.length)
-    assert_equal('follower', get_state(server))
+    @st.tick
+    assert_equal(4, @st.states.length)
+    assert_equal('candidate', get_state)
   end
 
   def test_update_term
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.set_term <+ [[3], [2]]}
-    server.tick
-    assert_equal(3, server.terms.length)
+    @st.sync_do { @st.set_term <+ [[3], [2]]}
+    @st.tick
+    assert_equal(3, @st.terms.length)
     # should have taken the max
-    assert_equal(3, get_term(server))
+    assert_equal(3, get_term)
   end
   
   def test_alarm
-    server = RealServerState.new
-    server.run_bg
-    server.sync_do { server.reset_timer <+ [[true]]}
-    server.tick
+    @st.sync_do { @st.reset_timer <+ [[true]]}
+    @st.tick
     sleep 0.2
-    assert_equal(0, server.alarms.length)
+    assert_equal(0, @st.alarms.length)
     sleep 1
-    assert_equal(1, server.alarms.length)
+    assert_equal(1, @st.alarms.length)
   end
 end
