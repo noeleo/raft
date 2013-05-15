@@ -4,9 +4,6 @@ require 'test/unit'
 
 require 'snooze_timer'
 
-# run with
-# ruby -I/[path to raft directory] -I. test/test_timer.rb
-
 class RealSnoozeTimer
   include Bud
   include SnoozeTimer

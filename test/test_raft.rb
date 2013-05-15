@@ -5,9 +5,6 @@ require 'raft'
 
 require 'server_state'
 
-# run with
-# ruby -I/[path to raft directory] -I. test/test_raft.rb
-
 class RealRaft
   include Bud
   include Raft

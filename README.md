@@ -73,7 +73,15 @@ interface :output, :alarm, [] => [:time_out]
 
 Tests
 -----
-Unit tests to test the Leader Election Implementation of RAFT in Bud are located in the /test directory.
+To run the entire test suite, including all unit and integration tests, run from the raft directory:
+```bash
+ruby -I. test/run_all.rb
+```
+
+To run any particular test (snooze_timer, for example), run:
+```bash
+ruby -I. test/test_snooze_timer.rb
+```
 
 NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 Duo, the timeout runs well at 300-800ms.
 

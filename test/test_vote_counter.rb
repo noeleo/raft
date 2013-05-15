@@ -4,9 +4,6 @@ require 'test/unit'
 
 require 'vote_counter'
 
-# run with
-# ruby -I/[path to raft directory] -I. test/test_vote_counter.rb
-
 class RealVoteCounter
   include Bud
   include VoteCounter

@@ -4,9 +4,6 @@ require 'test/unit'
 
 require 'server_state'
 
-# run with
-# ruby -I/[path to raft directory] -I. test/test_server_state.rb
-
 class RealServerState
   include Bud
   include ServerState
