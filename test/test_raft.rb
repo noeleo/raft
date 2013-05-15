@@ -16,8 +16,8 @@ class RealRaft
   end
 
   bloom do
-    states <= (current_state * current_term).pairs {|s, t| [budtime, s.state, t.term]}
-    #stdio <~ current_state.inspected
+    states <= (st.current_state * st.current_term).pairs {|s, t| [budtime, s.state, t.term]}
+    stdio <~ st.current_state.inspected
     #stdio <~ votes do |v|
     #    [v.term, v.from, v.is_granted] if v.from == ip_port
     #end
@@ -36,10 +36,11 @@ class TestRaft < Test::Unit::TestCase
   end
 
   def test_start_off_as_follower
-    server = RealRaft.new(:port => 54320)
+    server = RealRaft.new(:port => 54321)
+    server.set_cluster(create_cluster(2))
     server.run_bg
     # immediately check whether Raft instance starts as follower
-    assert server.current_state.values[0].first == 'follower'
+    assert server.st.current_state.values[0].first == 'follower'
     server.stop
   end
 
@@ -79,9 +80,9 @@ class TestRaft < Test::Unit::TestCase
     # a leader should have been chosen
     assert all_states.any?{|st| st == "leader"}
     # a single leader should have been chosen and converged
-    assert servers.map {|s| s.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    assert servers.map {|s| s.st.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
     # if we kill the leader, then a new one should be elected
-    leader_index = servers.map {|s| s.current_state.values[0].first }.index('leader')
+    leader_index = servers.map {|s| s.st.current_state.values[0].first }.index('leader')
     servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
@@ -99,16 +100,16 @@ class TestRaft < Test::Unit::TestCase
       listOfServers << instance
     end
     sleep 5
-    leaderServer = listOfServers.select{|s| s.current_state.values[0].first == 'leader'}.first
+    leaderServer = listOfServers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
     leaderServer.stop
     listOfServers.delete(leaderServer)
     #are there any more leaders
-    assert_equal(0, listOfServers.map{|s|s.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(0, listOfServers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
     assert_equal(4, listOfServers.count)
     #we have killed the server now, check to see if another election occurs
     (1..10).each {listOfServers.each{|serv| serv.sync_do} }
     sleep 5
-    assert_equal(1,listOfServers.map{|s|s.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(1,listOfServers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
     listOfServers << leaderServer
     assert_equal(5, listOfServers.count)
     listOfServers.each {|s| s.stop}
