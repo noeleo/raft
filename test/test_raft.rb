@@ -3,6 +3,8 @@ require 'bud'
 require 'test/unit'
 require 'raft'
 
+require 'server_state'
+
 # run with
 # ruby -I/[path to raft directory] -I. test/test_raft.rb
 
@@ -16,7 +18,7 @@ class RealRaft
 
   bloom do
     states <= (st.current_state * st.current_term).pairs {|s, t| [budtime, s.state, t.term]}
-    stdio <~ st.current_state.inspected
+    #stdio <~ st.current_state.inspected
   end
 end
 
@@ -112,6 +114,30 @@ class TestRaft < Test::Unit::TestCase
     start_servers(2)
     sleep 5
     assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+  end
+
+  def test_term_increments_with_election
+    
+    start_servers(5)
+    sleep 5 
+    oldTerm =  @servers[0].st.current_term.values[0][0]
+    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+
+    #lets kill the leader now and force another election
+    leaderServer = @servers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
+    leaderServer.stop
+    @servers.delete(leaderServer)
+
+    #make sure there are no leaders and 1 server less in cluster
+    assert_equal(0, @servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(4, @servers.count)
+
+    #start another election
+    sleep 5
+    newTerm = @servers[0].st.current_term.values[0][0]
+    #check to see if old term is less than new term
+ 
+    assert newTerm > oldTerm
   end
 
     ## TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term
