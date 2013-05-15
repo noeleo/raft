@@ -3,7 +3,7 @@ require 'bud'
 
 module VoteCounterProtocol
   state do
-    interface :input, :setup, [] => [:num_members]
+    interface :input, :setup, [] => [:num_voters]
     interface :input, :start_election, [] => [:term]
     interface :input, :vote, [:term, :candidate] => [:is_granted]
     interface :output, :election_won, [:term]
@@ -34,7 +34,42 @@ module VoteCounter
     end
     # if we have majority, then we won!
     election_won <= (config * current_term).pairs do |c, t|
-      [t.term] if yes_votes_granted_in_current_term.count > (c.num_members/2)
+      [t.term] if yes_votes_granted_in_current_term.count > (c.num_voters/2)
     end
   end
 end
+
+#using lmax
+#module VoteCounter
+#  include VoteCounterProtocol
+#
+#  state do
+#    table :config, setup.schema
+#    lmax :current_term
+#    table :voted, [:term, :candidate]
+#    table :yes_votes, [:term, :candidate]
+#    scratch :yes_votes_granted_in_current_term, [:candidate]
+#  end
+#
+#  bloom :configure do
+#    config <= setup
+#    current_term <= start_election {|e| Bud::MaxLattice.new(e.term)}
+#  end
+#  
+#  bloom do
+#    voted <= vote {|v| [v.term, v.candidate]}
+#    yes_votes <= vote {|v| [v.term, v.candidate] if v.is_granted}
+#    yes_votes_granted_in_current_term <= yes_votes {|v| [v.candidate] if current_term.reveal == v.term}
+#    #yes_votes_granted_in_current_term <= (yes_votes * current_term).pairs(:term => :term) do |v, t|
+#    #  [v.candidate]
+#    #end
+#    # if we have majority, then we won!
+#    election_won <= config do |c|
+#      [current_term.reveal] if yes_votes_granted_in_current_term.count > (c.num_voters/2)
+#    end
+#    #election_won <= (config * current_term).pairs do |c, t|
+#    #  [t.term] if yes_votes_granted_in_current_term.count > (c.num_voters/2)
+#    #end
+#  end
+#end
+#

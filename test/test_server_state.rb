@@ -14,11 +14,13 @@ class RealServerState
   state do
     table :states, [:time] => [:state]
     table :terms, [:time] => [:term]
+    table :alarms, [:time] => [:time_out]
   end
 
   bloom do
     states <= current_state {|s| [budtime, s.state]}
     terms <= current_term {|s| [budtime, s.term]}
+    alarms <= alarm {|a| [budtime, a.time_out]}
   end
 end
 
@@ -82,5 +84,16 @@ class TestServerState < Test::Unit::TestCase
     assert_equal(3, server.terms.length)
     # should have taken the max
     assert_equal(3, get_term(server))
+  end
+  
+  def test_alarm
+    server = RealServerState.new
+    server.run_bg
+    server.sync_do { server.reset_timer <+ [[true]]}
+    server.tick
+    sleep 0.2
+    assert_equal(0, server.alarms.length)
+    sleep 1
+    assert_equal(1, server.alarms.length)
   end
 end

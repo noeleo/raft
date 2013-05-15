@@ -1,7 +1,6 @@
 require 'rubygems'
 require 'bud'
 require 'test/unit'
-require 'pry'
 require 'raft'
 
 # run with
@@ -18,9 +17,6 @@ class RealRaft
   bloom do
     states <= (st.current_state * st.current_term).pairs {|s, t| [budtime, s.state, t.term]}
     stdio <~ st.current_state.inspected
-    #stdio <~ votes do |v|
-    #    [v.term, v.from, v.is_granted] if v.from == ip_port
-    #end
   end
 end
 
@@ -33,6 +29,21 @@ class TestRaft < Test::Unit::TestCase
       cluster << ["127.0.0.1:#{54320+num}"]
     end
     return cluster
+  end
+  
+  def start_servers(num_servers)
+    cluster = create_cluster(num_servers)
+    @servers = []
+    (1..num_servers).to_a.each do |num|
+      instance = RealRaft.new(:port => 54320 + num)
+      instance.set_cluster(cluster)
+      instance.run_bg
+      @servers << instance
+    end
+  end
+  
+  def teardown
+    @servers.each {|s| s.stop} if @servers
   end
 
   def test_start_off_as_follower
@@ -62,17 +73,10 @@ class TestRaft < Test::Unit::TestCase
 #  end
 
   def test_single_leader_elected
-    cluster = create_cluster(5)
-    servers = []
-    (1..5).to_a.each do |num|
-      instance = RealRaft.new(:port => 54320 + num)
-      instance.set_cluster(cluster)
-      instance.run_bg
-      servers << instance
-    end
+    start_servers(5)
     sleep 5
     all_states = []
-    servers.each do |s|
+    @servers.each do |s|
       s.states.values.each do |vals|
         all_states << vals[0]
       end
@@ -80,44 +84,38 @@ class TestRaft < Test::Unit::TestCase
     # a leader should have been chosen
     assert all_states.any?{|st| st == "leader"}
     # a single leader should have been chosen and converged
-    assert servers.map {|s| s.st.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    assert @servers.map {|s| s.st.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
     # if we kill the leader, then a new one should be elected
-    leader_index = servers.map {|s| s.st.current_state.values[0].first }.index('leader')
-    servers[leader_index].stop
+    leader_index = @servers.map {|s| s.st.current_state.values[0].first }.index('leader')
+    @servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
     # remove the other leader from the list and make sure another takes leader
-    servers.each {|s| s.stop}
   end
 
   def test_leader_going_offline_election_occurs
-    cluster = create_cluster(5)
-    listOfServers = []
-    (1..5).to_a.each do |num|
-      instance = RealRaft.new(:port => 54320 + num)
-      instance.set_cluster(cluster)
-      instance.run_bg
-      listOfServers << instance
-    end
+    start_servers(5)
     sleep 5
-    leaderServer = listOfServers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
+    leaderServer = @servers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
+    assert leaderServer != nil
     leaderServer.stop
-    listOfServers.delete(leaderServer)
+    @servers.delete(leaderServer)
     #are there any more leaders
-    assert_equal(0, listOfServers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
-    assert_equal(4, listOfServers.count)
+    assert_equal(0, @servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(4, @servers.count)
     #we have killed the server now, check to see if another election occurs
-    (1..10).each {listOfServers.each{|serv| serv.sync_do} }
     sleep 5
-    assert_equal(1,listOfServers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
-    listOfServers << leaderServer
-    assert_equal(5, listOfServers.count)
-    listOfServers.each {|s| s.stop}
+    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+  end
+  
+  def test_tie_for_leader
+    start_servers(2)
+    sleep 5
   end
 
     ## TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term
     ## find a follower:
-    #follower = listOfServers.select {|s| s.current_state.values[0].first == 'leader'}.first
+    #follower = @servers.select {|s| s.current_state.values[0].first == 'leader'}.first
     #follower_term = follower.current_term.values[0].first
     ##send follower a vote request with term greater than its term
     #  # request_vote_request:

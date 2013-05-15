@@ -33,7 +33,7 @@ module Raft
   bootstrap do
     members <= @HOSTS
     st.reset_timer <= [[true]]
-    vc.setup <= [[@HOSTS.count]]
+    vc.setup <= [[@HOSTS.count]]#+1]]
   end
 
   bloom :timeout do
@@ -49,13 +49,27 @@ module Raft
     st.reset_timer <= (st.alarm * st.current_state).pairs do |a|
       [true] if s.state != 'leader'
     end
-    # start counting votes and vote for ourselves
     vc.start_election <= st.current_term {|t| [t.term]}
     vc.vote <= st.current_term {|t| [t.term, ip_port, true]}
+    #voted_for <= st.current_term {|t| [t.term, ip_port]}
+  end
+  
+  bloom :candidate_mode do
+    # start counting votes and vote for ourselves
+    #vc.start_election <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+    #  [t.term] if s.state != 'leader'
+    #end
+    #vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+    #  [t.term, ip_port, true] if s.state != 'leader'
+    #end
+    #voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+    #  [t.term, ip_port] if s.state != 'leader'
+    #end
   end
 
   bloom :send_vote_requests do
     vote_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
+      #puts 'hi' if s.state == 'candidate' and not vc.voted.include?([t.term, m.host])
       [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate' and not vc.voted.include?([t.term, m.host])
     end
   end
@@ -88,6 +102,7 @@ module Raft
     end
     voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
     vote_response <~ (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
+      #puts "#{ip_port} voted for #{r.from} in term #{t.term}" if (r.from == v.candidate)# and not voted_for_in_current_term.exists?)
       [r.from, ip_port, t.term, (r.from == v.candidate and not voted_for_in_current_term.exists?)]
     end
     st.reset_timer <= (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
