@@ -37,6 +37,7 @@ module ServerState
   }
 
   state do
+    # TODO: current term with lmax
     table :current_state, [] => [:state]
     table :current_term, [] => [:term]
   end
