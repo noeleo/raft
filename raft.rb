@@ -64,7 +64,6 @@ module Raft
 
   bloom :send_vote_requests do
     vote_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
-      #puts 'hi' if s.state == 'candidate' and not vc.voted.include?([t.term, m.host])
       [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate' and not vc.voted.include?([t.term, m.host])
     end
   end
@@ -81,7 +80,6 @@ module Raft
     end
     # if we won the election, then we become leader
     st.set_state <= (vc.election_won * st.current_state * st.current_term).combos do |e, s, t|
-      #puts "WON! port #{ip_port} e.term #{e.term} and t.term #{t.term}"
       ['leader'] if s.state == 'candidate' and e.term == t.term
     end
   end
@@ -98,7 +96,6 @@ module Raft
     end
     voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
     vote_response <~ (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
-      #puts "#{ip_port} voted for #{r.from} in term #{t.term}" if (r.from == v.candidate)# and not voted_for_in_current_term.exists?)
       [r.from, ip_port, t.term, (r.from == v.candidate and not voted_for_in_current_term.exists?)]
     end
     st.reset_timer <= (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
