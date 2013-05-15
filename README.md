@@ -97,6 +97,8 @@ The test suite for RAFT Leader Election is in test_raft.rb. The test tests the f
   1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected.
   2. Test Leader Failure: If we kill the leader, then another one should be elected.
   3. Test Killing Maximum Number of Servers: Start a cluster of 5 servers, then immediately kill 2 of them. A leader should still be elected.
+  4. Test Leader Election Tie: Have 2 nodes vote for each other. Make sure that there is only one leader.
+  5. Test Term Increments with Election: Record the term after election #1. Kill the leader so another election starts and check to see if the new term is greater than the old term.
 
 
 References
