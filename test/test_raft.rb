@@ -111,6 +111,7 @@ class TestRaft < Test::Unit::TestCase
   def test_tie_for_leader
     start_servers(2)
     sleep 5
+    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
   end
 
     ## TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term

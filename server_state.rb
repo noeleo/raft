@@ -26,14 +26,14 @@ module ServerState
   end
 
   STATE_TO_ORDER = {
-    'follower' =>  'a',
-    'candidate' => 'b',
-    'leader' =>    'c'
+    'leader'    => 'a',
+    'follower'  => 'c',
+    'candidate' => 'b'
   }
   ORDER_TO_STATE = {
-    'a' => 'follower',
+    'a' => 'leader',
     'b' => 'candidate',
-    'c' => 'leader'
+    'c' => 'follower'
   }
 
   state do
