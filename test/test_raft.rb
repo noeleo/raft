@@ -2,7 +2,6 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 require 'pry'
-
 require 'raft'
 
 # run with
@@ -43,7 +42,7 @@ class TestRaft < Test::Unit::TestCase
     assert server.current_state.values[0].first == 'follower'
     server.stop
   end
-  
+
 #  def test_revert_to_follower
 #    server = RealRaft.new(:port => 54320)
 #    server.run_bg
@@ -86,19 +85,35 @@ class TestRaft < Test::Unit::TestCase
     servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
+    # remove the other leader from the list and make sure another takes leader
     servers.each {|s| s.stop}
   end
-    ## TEST : test that when a leader goes offline, a new leader is elected
-    ## find and stop the current leader:
-    #leader = listOfServers.select {|s| s.current_state.values[0].first == 'leader'}.first
-    #leader.stop
-    #listOfServers.delete(leader) # remove stopped server from listOfServers
-    #(1..10).each { listOfServers.each {|s| s.sync_do } }
-    ## now test that there is exactly one leader
-    ##assert listOfServers.map {|s| s.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
-    ##assert_equal(arrayOfStates.count('leader'),1)
-    ## CLEAN UP: add leader back to listOfServers
-    #listOfServers << leader
+
+  def test_leader_going_offline_election_occurs
+    cluster = create_cluster(5)
+    listOfServers = []
+    (1..5).to_a.each do |num|
+      instance = RealRaft.new(:port => 54320 + num)
+      instance.set_cluster(cluster)
+      instance.run_bg
+      listOfServers << instance
+    end
+    sleep 5
+    leaderServer = listOfServers.select{|s| s.current_state.values[0].first == 'leader'}.first
+    leaderServer.stop
+    listOfServers.delete(leaderServer)
+    #are there any more leaders
+    assert_equal(0, listOfServers.map{|s|s.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(4, listOfServers.count)
+    #we have killed the server now, check to see if another election occurs
+    (1..10).each {listOfServers.each{|serv| serv.sync_do} }
+    sleep 5
+    assert_equal(1,listOfServers.map{|s|s.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    listOfServers << leaderServer
+    assert_equal(5, listOfServers.count)
+    listOfServers.each {|s| s.stop}
+  end
+
     ## TEST : if a follower receives an RPC with term greater than its own, it increments its term to received term
     ## find a follower:
     #follower = listOfServers.select {|s| s.current_state.values[0].first == 'leader'}.first
