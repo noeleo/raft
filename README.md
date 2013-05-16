@@ -1,6 +1,7 @@
 Raft Consensus Algorithm in Bud
 =================================================
-This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud, explained in the sections below.
+This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud, explained in the sections below. This is a work in progress. We believe the most of the leader
+election functionality is in place, but there's no log replication yet.
 
 Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
 
