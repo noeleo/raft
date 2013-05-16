@@ -1,12 +1,14 @@
 Raft Consensus Algorithm in Bud
-=================================================
+===============================
 This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. There are a few changes made to the protocol for simplicity in programming using Bud, explained in the sections below. This is a work in progress. The leader
 election functionality is in place, but there's no log replication yet.
 
 Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
 
+Note that this is a work in progress. We believe leader election is working properly, but log replication is not itself implemented yet.
+
 ## Running a Raft Server
-Before starting an instance of Raft, you must specify the group of servers that the system will be running on. The format for specifying the server addresses is the array version of a Bloom collection, like:  
+Before starting an instance of Raft, you must specify the group of servers that the system will be running on using `set_cluster`. The format for specifying the server addresses is the array version of a Bloom collection, like:  
 `[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`  
 Then, to run the code, something like this should be done:
 ```ruby
@@ -15,7 +17,8 @@ r = RaftInstance.new(:port => 54321)
 r.set_cluster(cluster)
 r.run_bg
 ```
-An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.
+An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.  
+The range of timeouts can also be set using `set_timeout(min_timeout, max_timeout)`, where `min_timeout <= max_timeout` and both are in milliseconds. By default, the range is 300-800ms.
 
 Modules
 -------
@@ -84,7 +87,7 @@ To run any particular test (snooze_timer, for example), run:
 ruby -I. test/test_snooze_timer.rb
 ```
 
-NOTE: Election timeouts are dependent on processor speed. On a 2.26 Ghz Core 2 Duo, the timeout runs well at 300-800ms.
+NOTE: The effectiveness of election timeouts are dependent on processor speed. Running on a single 2.26 Ghz Core 2 Duo, the timeouts run well at the default 300-800ms.
 
 ### Timer Tests
 The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following cases:
@@ -108,7 +111,6 @@ The test suite for RAFT Leader Election is in test_raft.rb. The test tests the f
   3. Test Killing Maximum Number of Servers: Start a cluster of 5 servers, then immediately kill 2 of them. A leader should still be elected.
   4. Test Leader Election Tie: Have 2 nodes vote for each other. Make sure that there is only one leader.
   5. Test Term Increments with Election: Record the term after election #1. Kill the leader so another election starts and check to see if the new term is greater than the old term.
-
 
 References
 ----------
