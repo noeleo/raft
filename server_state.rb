@@ -7,8 +7,7 @@ module ServerStateProtocol
   state do
     interface :input, :set_state, [:state]
     interface :input, :set_term, [:term]
-    # reset should always be true
-    interface :input, :reset_timer, [] => [:reset]
+    interface :input, :reset_timer, [:time_out]
     interface :output, :alarm, [] => [:time_out]
   end
 end
@@ -16,19 +15,11 @@ end
 module ServerState
   include ServerStateProtocol
   import SnoozeTimer => :timer
-  
-  # set timeouts in milliseconds
-  MIN_TIMEOUT = 300
-  MAX_TIMEOUT = 800
-  
-  def random_timeout
-    MIN_TIMEOUT + rand(MAX_TIMEOUT - MIN_TIMEOUT)
-  end
 
   STATE_TO_ORDER = {
     'leader'    => 'a',
-    'follower'  => 'c',
-    'candidate' => 'b'
+    'candidate' => 'b',
+    'follower'  => 'c'
   }
   ORDER_TO_STATE = {
     'a' => 'leader',
@@ -37,7 +28,6 @@ module ServerState
   }
 
   state do
-    # TODO: current term with lmax
     table :current_state, [] => [:state]
     table :current_term, [] => [:term]
   end
@@ -66,8 +56,8 @@ module ServerState
   
   bloom :manage_timer do
     # reset timer
-    temp :final_timer <= reset_timer.argagg(:choose, [], :reset)
-    timer.set_alarm <= final_timer {|t| [random_timeout]}
+    temp :final_timer <= reset_timer.argagg(:choose, [], :time_out)
+    timer.set_alarm <= final_timer {|t| [t.time_out]}
     # set off alarm
     alarm <= timer.alarm {|t| [t.time_out]}
   end

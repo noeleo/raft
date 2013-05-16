@@ -20,7 +20,10 @@ class RealRaft
 end
 
 class TestRaft < Test::Unit::TestCase
-
+  def teardown
+    @servers.each {|s| s.stop} if @servers
+  end
+  
   # create a cluster of servers with addresses starting with localhost:54321
   def create_cluster(num_servers)
     cluster = []
@@ -41,35 +44,37 @@ class TestRaft < Test::Unit::TestCase
     end
   end
   
-  def teardown
-    @servers.each {|s| s.stop} if @servers
+  def get_state(server)
+    server.st.current_state.values[0][0]
+  end
+
+  def get_term(server)
+    server.st.current_term.values[0][0]
   end
 
   def test_start_off_as_follower
-    server = RealRaft.new(:port => 54321)
-    server.set_cluster(create_cluster(2))
-    server.run_bg
+    start_servers(1)
+    server = @servers.first
     # immediately check whether Raft instance starts as follower
-    assert server.st.current_state.values[0].first == 'follower'
-    server.stop
+    assert get_state(server) == 'follower'
   end
 
-#  def test_revert_to_follower
-#    server = RealRaft.new(:port => 54320)
-#    server.run_bg
-#    sleep 1
-#    # server should now be a candidate, term should be 2
-#    assert server.current_state.values[0].first == 'candidate'
-#    assert server.current_term.values[0].first == 2
-#    # send RPC with higher term to server
-#    server.append_entries_request <~ [['127.0.0.1:54320', '127.0.0.1:54321', 10, 0, 0, 0, 0]]
-#    sleep 3
-#    # server should now have updated its term and reverted to follower state
-#    puts "term: #{server.current_state.values[0].first}"
-#    assert server.current_state.values[0].first == 'follower'
-#    assert server.current_term.values[0].first == 10
-#    server.stop
-#  end
+  def test_revert_to_follower
+    start_servers(1)
+    server = @servers.first
+    server.set_timeout(1000, 1000)
+    sleep 2
+    # server should now be a leader since there is only 1 server
+    assert_equal 'leader', get_state(server)
+    #assert_equal 2, get_term(server)
+    # send RPC with higher term to server
+    server.append_entries_request <~ [['127.0.0.1:54321', '127.0.0.1:54322', 10, 0, 0, 0, 0]]
+    sleep 0.1
+    # server should now have updated its term and reverted to follower state
+    puts "term: #{get_term(server)}"
+    #assert_equal 'follower', get_state(server)
+    #assert_equal 10, get_term(server)
+  end
 
   def test_single_leader_elected
     start_servers(5)
@@ -114,26 +119,21 @@ class TestRaft < Test::Unit::TestCase
   end
 
   def test_term_increments_with_election
-    
     start_servers(5)
     sleep 5 
     oldTerm =  @servers[0].st.current_term.values[0][0]
     assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
-
-    #lets kill the leader now and force another election
+    # kill the leader and force another election
     leaderServer = @servers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
     leaderServer.stop
     @servers.delete(leaderServer)
-
-    #make sure there are no leaders and 1 server less in cluster
+    # make sure there are no leaders and 1 server less in cluster
     assert_equal(0, @servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
     assert_equal(4, @servers.count)
-
-    #start another election
+    # start another election
     sleep 5
     newTerm = @servers[0].st.current_term.values[0][0]
-    #check to see if old term is less than new term
- 
+    # check to see if old term is less than new term
     assert newTerm > oldTerm
   end
 

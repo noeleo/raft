@@ -83,11 +83,11 @@ class TestServerState < Test::Unit::TestCase
   end
   
   def test_alarm
-    @st.sync_do { @st.reset_timer <+ [[true]]}
+    @st.sync_do { @st.reset_timer <+ [[2000]]}
     @st.tick
-    sleep 0.2
-    assert_equal(0, @st.alarms.length)
     sleep 1
+    assert_equal(0, @st.alarms.length)
+    sleep 2
     assert_equal(1, @st.alarms.length)
   end
 end

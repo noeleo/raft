@@ -7,15 +7,28 @@ require 'vote_counter'
 module RaftProtocol
 end
 
+# TODO: coordinate setting the state, NOT in server_state, so that we can be in only one specific state at a tick
 module Raft
   include RaftProtocol
   import ServerState => :st
   import VoteCounter => :vc
 
+  # should be initialize but don't want to override Bud initializer
   def set_cluster(cluster)
     @HOSTS = cluster
+    @MIN_TIMEOUT = 300
+    @MAX_TIMEOUT = 800
   end
-
+  
+  def set_timeout(min_time, max_time)
+    @MIN_TIMEOUT = min_time
+    @MAX_TIMEOUT = max_time
+  end
+  
+  def random_timeout
+    @MIN_TIMEOUT + rand(@MAX_TIMEOUT - @MIN_TIMEOUT)
+  end
+  
   state do
     channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
     channel :vote_response, [:@dest, :from, :term, :is_granted]
@@ -32,7 +45,7 @@ module Raft
 
   bootstrap do
     members <= @HOSTS - [[ip_port]]
-    st.reset_timer <= [[true]]
+    st.reset_timer <= [[random_timeout]]
     vc.setup <= [[@HOSTS.count]]
   end
   
@@ -43,6 +56,7 @@ module Raft
   bloom :timeout do
     # increment current term
     st.set_term <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+      puts "ok #{s.state}"
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
@@ -51,7 +65,7 @@ module Raft
     end
     # reset the timer
     st.reset_timer <= (st.alarm * st.current_state).pairs do |a|
-      [true] if s.state != 'leader'
+      [random_timeout] if s.state != 'leader'
     end
     # vote for ourselves
     vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
@@ -101,7 +115,7 @@ module Raft
       [r.from, ip_port, t.term, (r.from == v.candidate and not voted_for_in_current_term.exists?)]
     end
     st.reset_timer <= (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
-      [true] if r.from == v.candidate and not voted_for_in_current_term.exists?
+      [random_timeout] if r.from == v.candidate and not voted_for_in_current_term.exists?
     end
     voted_for <+ (voted_for_in_current_step * st.current_term).pairs do |v, t|
       [t.term, v.candidate] if not voted_for_in_current_term.exists?
@@ -122,7 +136,7 @@ module Raft
     end
     # reset our timer if the term is current or our term is stale
     st.reset_timer <= (append_entries_request * st.current_term).pairs do |a, t|
-      [true] if a.term >= t.term
+      [random_timeout] if a.term >= t.term
     end
     # update term if our term is stale
     st.set_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
