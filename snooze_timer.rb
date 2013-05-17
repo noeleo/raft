@@ -7,7 +7,6 @@ module SnoozeTimerProtocol
   state do
     # time_out is in milliseconds
     interface :input, :set_alarm, [] => [:time_out]
-    #interface :input, :cancel_alarm, [] => [:cancel]
     interface :output, :alarm, [] => [:time_out]
   end
 end
@@ -22,9 +21,6 @@ module SnoozeTimer
   end
 
   bloom do
-    #timer_state <- (timer_state * cancel_alarm).pairs do |s, c|
-    #  s
-    #end
     buffer <= (timer_state * timer).pairs do |s, t|
       s if (t.val.to_f - s.start_time) > (s.time_out.to_f/1000)
     end

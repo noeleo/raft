@@ -94,12 +94,6 @@ class TestLeaderElection < Test::Unit::TestCase
     assert all_states.any?{|st| st == "leader"}
     # a single leader should have been chosen and converged
     assert @servers.map {|s| get_state(s) }.select {|str| str == 'leader'}.count == 1
-    # if we kill the leader, then a new one should be elected
-    leader_index = @servers.map {|s| get_state(s) }.index('leader')
-    @servers[leader_index].stop
-    sleep 5
-    # TODO: finish the above test
-    # remove the other leader from the list and make sure another takes leader
   end
 
   def test_leader_going_offline_election_occurs
