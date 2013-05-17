@@ -11,6 +11,7 @@ class RealRaft
 
   state do
     table :states, [:timestamp] => [:state, :term]
+    scratch :alarm_went_off, st.alarm.schema
   end
 
   bloom do
@@ -19,7 +20,7 @@ class RealRaft
   end
 end
 
-class TestRaft < Test::Unit::TestCase
+class TestLeaderElection < Test::Unit::TestCase
   def teardown
     @servers.each {|s| s.stop} if @servers
   end
@@ -33,12 +34,13 @@ class TestRaft < Test::Unit::TestCase
     return cluster
   end
   
-  def start_servers(num_servers)
+  def start_servers(num_servers, options = {})
     cluster = create_cluster(num_servers)
     @servers = []
     (1..num_servers).to_a.each do |num|
       instance = RealRaft.new(:port => 54320 + num)
       instance.set_cluster(cluster)
+      instance.set_timeout(options[:time_out][0], options[:time_out][1]) if options[:time_out]
       instance.run_bg
       @servers << instance
     end
@@ -51,6 +53,10 @@ class TestRaft < Test::Unit::TestCase
   def get_term(server)
     server.st.current_term.values[0][0]
   end
+  
+  def get_states(server)
+    server.states.values.map {|v| v[0]}
+  end
 
   def test_start_off_as_follower
     start_servers(1)
@@ -60,20 +66,19 @@ class TestRaft < Test::Unit::TestCase
   end
 
   def test_revert_to_follower
-    start_servers(1)
+    start_servers(1, :time_out => [1000, 1000])
     server = @servers.first
-    server.set_timeout(1000, 1000)
-    sleep 2
-    # server should now be a leader since there is only 1 server
+    # server should increment term after a second, and transition from candidate to leader quickly
+    sleep 1.5
+    assert_equal 2, get_term(server)
+    assert get_states(server).include?('candidate')
     assert_equal 'leader', get_state(server)
-    #assert_equal 2, get_term(server)
     # send RPC with higher term to server
     server.append_entries_request <~ [['127.0.0.1:54321', '127.0.0.1:54322', 10, 0, 0, 0, 0]]
-    sleep 0.1
+    sleep 0.5
     # server should now have updated its term and reverted to follower state
-    puts "term: #{get_term(server)}"
-    #assert_equal 'follower', get_state(server)
-    #assert_equal 10, get_term(server)
+    assert_equal 10, get_term(server)
+    assert_equal 'follower', get_state(server)
   end
 
   def test_single_leader_elected
@@ -88,9 +93,9 @@ class TestRaft < Test::Unit::TestCase
     # a leader should have been chosen
     assert all_states.any?{|st| st == "leader"}
     # a single leader should have been chosen and converged
-    assert @servers.map {|s| s.st.current_state.values[0].first }.select {|str| str == 'leader'}.count == 1
+    assert @servers.map {|s| get_state(s) }.select {|str| str == 'leader'}.count == 1
     # if we kill the leader, then a new one should be elected
-    leader_index = @servers.map {|s| s.st.current_state.values[0].first }.index('leader')
+    leader_index = @servers.map {|s| get_state(s) }.index('leader')
     @servers[leader_index].stop
     sleep 5
     # TODO: finish the above test
@@ -100,39 +105,39 @@ class TestRaft < Test::Unit::TestCase
   def test_leader_going_offline_election_occurs
     start_servers(5)
     sleep 5
-    leaderServer = @servers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
+    leaderServer = @servers.select{|s| get_state(s) == 'leader'}.first
     assert leaderServer != nil
     leaderServer.stop
     @servers.delete(leaderServer)
     #are there any more leaders
-    assert_equal(0, @servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(0, @servers.map{|s| get_state(s)}.select{|state| state == 'leader'}.count)
     assert_equal(4, @servers.count)
     #we have killed the server now, check to see if another election occurs
     sleep 5
-    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(1,@servers.map{|s| get_state(s)}.select{|state| state == 'leader'}.count)
   end
   
   def test_tie_for_leader
     start_servers(2)
     sleep 5
-    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(1,@servers.map{|s| get_state(s)}.select{|state| state == 'leader'}.count)
   end
 
   def test_term_increments_with_election
     start_servers(5)
     sleep 5 
-    oldTerm =  @servers[0].st.current_term.values[0][0]
-    assert_equal(1,@servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    oldTerm =  get_term(@servers.first)
+    assert_equal(1,@servers.map{|s| get_state(s)}.select{|state| state == 'leader'}.count)
     # kill the leader and force another election
-    leaderServer = @servers.select{|s| s.st.current_state.values[0].first == 'leader'}.first
+    leaderServer = @servers.select{|s| get_state(s) == 'leader'}.first
     leaderServer.stop
     @servers.delete(leaderServer)
     # make sure there are no leaders and 1 server less in cluster
-    assert_equal(0, @servers.map{|s|s.st.current_state.values[0].first}.select{|state| state == 'leader'}.count)
+    assert_equal(0, @servers.map{|s| get_state(s)}.select{|state| state == 'leader'}.count)
     assert_equal(4, @servers.count)
     # start another election
     sleep 5
-    newTerm = @servers[0].st.current_term.values[0][0]
+    newTerm = get_term(@servers.first)
     # check to see if old term is less than new term
     assert newTerm > oldTerm
   end

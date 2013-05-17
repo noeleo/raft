@@ -50,13 +50,12 @@ module Raft
   end
   
   bloom :module_input do
-    vc.count_votes <= st.current_term {|t| [t.term]}
+    vc.count_votes <= st.current_term {|t| [t.term] }
   end
 
   bloom :timeout do
     # increment current term
     st.set_term <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-      puts "ok #{s.state}"
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
@@ -67,12 +66,12 @@ module Raft
     st.reset_timer <= (st.alarm * st.current_state).pairs do |a|
       [random_timeout] if s.state != 'leader'
     end
-    # vote for ourselves
+    # vote for ourselves (have to do term + 1 because it hasn't been incremented yet)
     vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-      [t.term, ip_port, true] if s.state != 'leader'
+      [t.term+1, ip_port, true] if s.state != 'leader'
     end
     voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-      [t.term, ip_port] if s.state != 'leader'
+      [t.term+1, ip_port] if s.state != 'leader'
     end
   end
 
@@ -94,7 +93,6 @@ module Raft
     end
     # if we won the election, then we become leader
     st.set_state <= (vc.election_won * st.current_state * st.current_term).combos do |e, s, t|
-      #puts "#{ip_port} won with e.term #{e.term} and t.term #{t.term}"
       ['leader'] if s.state == 'candidate' and e.term == t.term
     end
   end

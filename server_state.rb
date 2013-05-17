@@ -16,16 +16,8 @@ module ServerState
   include ServerStateProtocol
   import SnoozeTimer => :timer
 
-  STATE_TO_ORDER = {
-    'leader'    => 'a',
-    'candidate' => 'b',
-    'follower'  => 'c'
-  }
-  ORDER_TO_STATE = {
-    'a' => 'leader',
-    'b' => 'candidate',
-    'c' => 'follower'
-  }
+  # states in order of "importance"
+  STATES = ['leader', 'candidate', 'follower']
 
   state do
     table :current_state, [] => [:state]
@@ -39,11 +31,11 @@ module ServerState
 
   bloom :manage_state do
     temp :reordered <= set_state do |s|
-      [STATE_TO_ORDER[s.state]]
+      [STATES.index(s.state)]
     end
     temp :final_state <= reordered.argagg(:min, [], :state)
     current_state <+- final_state do |s|
-      [ORDER_TO_STATE[s.state]]
+      [STATES[s.state]]
     end
   end
 
