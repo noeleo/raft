@@ -31,7 +31,7 @@ When a response is received, it is stored if the terms of both the sender and re
 In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
 
 ### Server State
-The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, and an interface for snoozing the timer/having the alarm go off.
+The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, and an interface for snoozing the timer/having the alarm go off. Setting the term can only have the effect of increasing `current_term` or not affecting it at all.
 
 ServerStateProtocol Interface
 ```ruby

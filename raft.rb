@@ -7,7 +7,6 @@ require 'vote_counter'
 module RaftProtocol
 end
 
-# TODO: coordinate setting the state, NOT in server_state, so that we can be in only one specific state at a tick
 module Raft
   include RaftProtocol
   import ServerState => :st
@@ -81,7 +80,7 @@ module Raft
     end
   end
 
-  bloom :count_votes do
+  bloom :candidate_operation do
     # if we discover our term is stale, step down to follower and update our term
     st.set_state <= (st.current_state * vote_response * st.current_term).combos do |s, v, t|
       ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
@@ -112,6 +111,7 @@ module Raft
     vote_response <~ (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
       [r.from, ip_port, t.term, (r.from == v.candidate and not voted_for_in_current_term.exists?)]
     end
+    # reset the timer if we grant a vote to a candidate
     st.reset_timer <= (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
       [random_timeout] if r.from == v.candidate and not voted_for_in_current_term.exists?
     end
@@ -132,14 +132,21 @@ module Raft
     st.set_state <= (st.current_state * append_entries_request * st.current_term).combos do |s, v, t|
       ['follower'] if (s.state == 'candidate' and v.term >= t.term) or (s.state == 'leader' and v.term > t.term)
     end
+    # update term if our term is stale
+    st.set_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
     # reset our timer if the term is current or our term is stale
     st.reset_timer <= (append_entries_request * st.current_term).pairs do |a, t|
       [random_timeout] if a.term >= t.term
     end
-    # update term if our term is stale
-    st.set_term <= append_entries_request.argmax([:term], :term) {|a| [a.term]}
-    # TODO: step down as leader if our term is stale
     # TODO: respond to append entries
-    # TODO: update leader if we get an append entries (and if we are leader, only if our term is stale)
+  end
+  
+  bloom :leader_operation do
+    # step down as leader if our term is stale and update our term
+    st.set_state <= (st.current_state * append_entries_response * st.current_term).combos do |s, a, t|
+      ['follower'] if a.term > t.term
+    end
+    st.set_term <= append_entries_response.argmax([:term], :term) {|a| [a.term]}
+    # TODO: receive responses to append_entries
   end
 end
