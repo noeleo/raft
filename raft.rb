@@ -50,7 +50,7 @@ module Raft
   end
   
   bloom :module_input do
-    vc.count_votes <= st.current_term {|t| [t.term] }
+    vc.count_votes <= st.current_term {|t| [t.term]}
   end
 
   bloom :timeout do
@@ -68,10 +68,10 @@ module Raft
     end
     # vote for ourselves (have to do term + 1 because it hasn't been incremented yet)
     vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-      [t.term+1, ip_port, true] if s.state != 'leader'
+      [t.term + 1, ip_port, true] if s.state != 'leader'
     end
-    voted_for <+- (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
-      [t.term+1, ip_port] if s.state != 'leader'
+    voted_for <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+      [t.term + 1, ip_port] if s.state != 'leader'
     end
   end
 
