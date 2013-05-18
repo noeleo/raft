@@ -43,7 +43,7 @@ module Raft
   end
 
   bootstrap do
-    members <= @HOSTS - [[ip_port]]
+    members <= @HOSTS - [ip_port]
     st.reset_timer <= [[random_timeout]]
     vc.setup <= [[@HOSTS.count]]
   end
