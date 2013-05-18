@@ -25,7 +25,7 @@ class RaftTester < Test::Unit::TestCase
   def create_cluster(num_servers)
     cluster = []
     (1..num_servers).to_a.each do |num|
-      cluster << ["127.0.0.1:#{54320+num}"]
+      cluster << "127.0.0.1:#{54320+num}"
     end
     return cluster
   end
@@ -34,9 +34,8 @@ class RaftTester < Test::Unit::TestCase
     cluster = create_cluster(num_servers)
     @servers = []
     (1..num_servers).to_a.each do |num|
-      instance = RealRaft.new(:port => 54320 + num)
-      instance.set_cluster(cluster)
-      instance.set_timeout(options[:time_out][0], options[:time_out][1]) if options[:time_out]
+      instance = RealRaft.new(cluster, :port => 54320 + num)
+      instance.set_timeout(options[:timeout][0], options[:timeout][1]) if options[:timeout]
       instance.run_bg
       @servers << instance
     end

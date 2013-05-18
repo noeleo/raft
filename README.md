@@ -7,16 +7,17 @@ Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS
 Note that this is a work in progress. We believe leader election is working properly, but log replication is not itself implemented yet.
 
 ## Running a Raft Server
-Before starting an instance of Raft, you must specify the group of servers that the system will be running on using `set_cluster`. The format for specifying the server addresses is the array version of a Bloom collection, like:  
-`[['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]`  
+Before starting an instance of Raft, you must specify the group of servers that the system will be running on by passing them into the constructor. This is done via an array of addresses, like:  
+`['127.0.0.1:54321', '127.0.0.1:54322', '127.0.0.1:54323']`  
 Then, to run the code, something like this should be done:
 ```ruby
-cluster = [['127.0.0.1:54321'], ['127.0.0.1:54322'], ['127.0.0.1:54323']]
-r = RaftInstance.new(:port => 54321)
-r.set_cluster(cluster)
+cluster = ['127.0.0.1:54321', '127.0.0.1:54322', '127.0.0.1:54323']
+r = RaftInstance.new(cluster, :port => 54321)
+r.set_timeout(100, 500)
 r.run_bg
 ```
-An explicit address instead of localhost should be used, because `set_cluster` removes the address of the current server, which is stored as an explicit address.  
+An explicit address instead of localhost should be used, because this is how Bud stores them.
+
 The range of timeouts can also be set using `set_timeout(min_timeout, max_timeout)`, where `min_timeout <= max_timeout` and both are in milliseconds. By default, the range is 300-800ms.
 
 Modules
@@ -33,7 +34,6 @@ In responding to VoteRequests, a server will only grant a vote if the terms are 
 ### Server State
 The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, and an interface for snoozing the timer/having the alarm go off. Setting the term can only have the effect of increasing `current_term` or not affecting it at all.
 
-ServerStateProtocol Interface
 ```ruby
 interface :input, :set_state, [:state]
 interface :input, :set_term, [:term]
@@ -41,8 +41,7 @@ interface :input, :reset_timer, [] => [:reset]
 interface :output, :alarm, [] => [:time_out]
 ```
 
-The tables in ServerState should be "reached into" by the outer module to grab the state and term.  
-ServerState Module State
+The tables in ServerState should be "reached into" by the outer module to grab the state and term.
 ```ruby
 table :current_state, [] => [:state]
 table :current_term, [] => [:term]
@@ -51,7 +50,6 @@ table :current_term, [] => [:term]
 ### Vote Counter
 The vote counter counts votes and alerts when an election has been won in the specified term. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority in the specified term passed in.
 
-VoteCounterProtocol Interface
 ```ruby
 interface :input, :setup, [] => [:num_voters]
 interface :input, :count_votes, [] => [:term]
@@ -59,8 +57,7 @@ interface :input, :vote, [:term, :candidate] => [:is_granted]
 interface :output, :election_won, [:term]
 ```
 
-The `voted` table can be useful to see who has voted (either granted or not granted).  
-VoteCounter State
+The `voted` table can be useful to see who has voted (either granted or not granted).
 ```ruby
 table :voted, [:term, :candidate]
 ```
@@ -68,7 +65,6 @@ table :voted, [:term, :candidate]
 ### Snooze Timer
 The election timer is handled by the SnoozeTimer Module. The timer works by setting an alarm with a timeout via the `set_alarm` input interface and having it go off via the `alarm` output. If another `set_alarm` is issued before the current alarm goes off, the alarm will be reset, thereby hitting "snooze" on the alarm. In keeping with the design of keeping everything as simple as possible and only features necessary, the module holds only a single timer at a time.
 
-SnoozeTimerProtocol Interface
 ```ruby
 interface :input, :set_alarm, [] => [:time_out]
 interface :output, :alarm, [] => [:time_out]

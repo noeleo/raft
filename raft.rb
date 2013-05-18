@@ -12,11 +12,11 @@ module Raft
   import ServerState => :st
   import VoteCounter => :vc
 
-  # should be initialize but don't want to override Bud initializer
-  def set_cluster(cluster)
-    @HOSTS = cluster
+  def initialize(cluster, options = {})
+    @HOSTS = cluster.map {|x| [x]}
     @MIN_TIMEOUT = 300
     @MAX_TIMEOUT = 800
+    super(options)
   end
   
   def set_timeout(min_time, max_time)
