@@ -6,7 +6,7 @@ module VoteCounterProtocol
     interface :input, :setup, [] => [:num_voters]
     interface :input, :count_votes, [] => [:term]
     interface :input, :vote, [:term, :candidate] => [:is_granted]
-    interface :output, :election_won, [:term]
+    interface :output, :race_won, [:term]
   end
 end
 
@@ -31,7 +31,7 @@ module VoteCounter
       [v.candidate]
     end
     # if we have majority, then we won!
-    election_won <= (config * count_votes).pairs do |c, t|
+    race_won <= (config * count_votes).pairs do |c, t|
       [t.term] if yes_votes_granted_in_current_term.count > (c.num_voters/2)
     end
   end

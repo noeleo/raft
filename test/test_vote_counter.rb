@@ -13,7 +13,7 @@ class RealVoteCounter
   end
 
   bloom do
-    wins <= election_won {|a| [budtime, a.term]}
+    wins <= race_won {|a| [budtime, a.term]}
   end
 end
 

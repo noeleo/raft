@@ -84,7 +84,7 @@ module Raft
   bloom :candidate_operation do
     # if we discover our term is stale, step down to follower and update our term
     st.set_state <= (st.current_state * vote_response * st.current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+      ['follower'] if (s.state == 'candidate' or s.state == 'leader') and v.term > t.term
     end
     st.set_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
@@ -92,7 +92,7 @@ module Raft
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
     end
     # if we won the election, then we become leader
-    st.set_state <= (vc.election_won * st.current_state * st.current_term).combos do |e, s, t|
+    st.set_state <= (vc.race_won * st.current_state * st.current_term).combos do |e, s, t|
       ['leader'] if s.state == 'candidate' and e.term == t.term
     end
   end
@@ -100,7 +100,7 @@ module Raft
   bloom :cast_votes do
     # if we discover our term is stale, step down to follower and update our term
     st.set_state <= (st.current_state * vote_request * st.current_term).combos do |s, v, t|
-      ['follower'] if s.state == 'candidate' or s.state == 'leader' and v.term > t.term
+      ['follower'] if (s.state == 'candidate' or s.state == 'leader') and v.term > t.term
     end
     st.set_term <= vote_request.argmax([:term], :term) {|v| [v.term]}
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
