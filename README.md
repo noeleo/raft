@@ -13,12 +13,12 @@ Then, to run the code, something like this should be done:
 ```ruby
 cluster = ['127.0.0.1:54321', '127.0.0.1:54322', '127.0.0.1:54323']
 r = RaftInstance.new(cluster, :port => 54321)
-r.set_timeout(100, 500)
+r.set_timeout(100)
 r.run_bg
 ```
 An explicit address instead of localhost should be used, because this is how Bud stores them.
 
-The range of timeouts can also be set using `set_timeout(min_timeout, max_timeout)`, where `min_timeout <= max_timeout` and both are in milliseconds. By default, the range is 300-800ms.
+The timeout can also be manually set using `set_timeout(min_timeout, is_random = true)`. A random timeout will be in the range between `min_timeout` milliseconds and twice that, and a non-random timeout will always be the minimum timeout. By default, timeouts are 300ms at minimum and random.
 
 Modules
 -------
@@ -82,7 +82,7 @@ To run any particular test (snooze_timer, for example), run:
 ruby -I. test/test_snooze_timer.rb
 ```
 
-NOTE: The effectiveness of election timeouts are dependent on processor speed. Running on a single 2.26 Ghz Core 2 Duo, the timeouts run well at the default 300-800ms.
+NOTE: The effectiveness of election timeouts are dependent on processor speed. Running on a single 2.26 Ghz Core 2 Duo, the timeouts run well at the default 300-600ms.
 
 ### Timer Tests
 The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following cases:

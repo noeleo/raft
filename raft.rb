@@ -15,17 +15,18 @@ module Raft
   def initialize(cluster, options = {})
     @HOSTS = cluster.map {|x| [x]}
     @MIN_TIMEOUT = 300
-    @MAX_TIMEOUT = 800
+    @IS_TIMEOUT_RANDOM = true
     super(options)
   end
   
-  def set_timeout(min_time, max_time)
+  def set_timeout(min_time, is_random = true)
     @MIN_TIMEOUT = min_time
-    @MAX_TIMEOUT = max_time
+    @IS_TIMEOUT_RANDOM = is_random
   end
   
+  # a random timeout in range range between the min timeout and twice that
   def random_timeout
-    @MIN_TIMEOUT + rand(@MAX_TIMEOUT - @MIN_TIMEOUT)
+    @IS_TIMEOUT_RANDOM ? @MIN_TIMEOUT + rand(@MIN_TIMEOUT) : @MIN_TIMEOUT
   end
   
   state do

@@ -35,7 +35,8 @@ class RaftTester < Test::Unit::TestCase
     @servers = []
     (1..num_servers).to_a.each do |num|
       instance = RealRaft.new(cluster, :port => 54320 + num)
-      instance.set_timeout(options[:timeout][0], options[:timeout][1]) if options[:timeout]
+      # if timeout is set, make the timeout deterministic
+      instance.set_timeout(options[:timeout], false) if options[:timeout]
       instance.run_bg
       @servers << instance
     end

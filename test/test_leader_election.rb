@@ -10,7 +10,7 @@ class TestLeaderElection < RaftTester
   end
 
   def test_revert_to_follower
-    start_servers(1, :timeout => [1000, 1000])
+    start_servers(1, :timeout => 1000)
     server = @servers.first
     # server should increment term after a second, and transition from candidate to leader quickly
     sleep 1.5
