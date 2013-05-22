@@ -4,7 +4,7 @@ This is one of the first implementations of Raft in Bud, a Bloom DSL for Ruby. T
 
 Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS 194: Distributed Systems, in Spring 2013, taught by Joe Hellerstein and Peter Alvaro. Thanks to Diego Ongaro from Stanford for being an advisor on the Raft Protocol.
 
-Note that this is a work in progress. We believe leader election is working properly, but log replication is not itself implemented yet.
+Note that this is a work in progress. We believe leader election and recovery is working properly, but log replication is not itself implemented fully. We also have not implemented dynamic membership.
 
 ## Running a Raft Server
 Before starting an instance of Raft, you must specify the group of servers that the system will be running on by passing them into the constructor. This is done via an array of addresses, like:  

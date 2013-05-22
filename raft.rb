@@ -30,15 +30,24 @@ module Raft
   end
   
   state do
+    # client communication
+    channel :issue_command, [:@dest, :command]
+    
+    # RPCs
     channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
     channel :vote_response, [:@dest, :from, :term, :is_granted]
-    channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :request_entry, :commit_index]
+    channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :entry, :commit_index]
     channel :append_entries_response, [:@dest, :from, :term, :is_success]
 
+    # leader election
     table :members, [:host]
     table :voted_for, [:term] => [:candidate]
     scratch :voted_for_in_current_term, [] => [:candidate]
     scratch :voted_for_in_current_step, [] => [:candidate]
+    
+    # log replication
+    #sync :logs, :dbm, [:index] => [:term, :command]
+    table :logs, [:index] => [:term, :command]
 
     periodic :heartbeat, 0.1
   end
@@ -93,7 +102,7 @@ module Raft
     end
     # if we won the election, then we become leader
     st.set_state <= (vc.race_won * st.current_state * st.current_term).combos do |e, s, t|
-      ['leader'] if s.state == 'candidate' and e.term == t.term
+      ['leader'] if s.state == 'candidate' and e.race == t.term
     end
   end
 
