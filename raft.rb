@@ -2,6 +2,7 @@ require 'rubygems'
 require 'bud'
 
 require 'server_state'
+require 'logger'
 require 'vote_counter'
 
 module RaftProtocol
@@ -10,7 +11,9 @@ end
 module Raft
   include RaftProtocol
   import ServerState => :st
-  import VoteCounter => :vc
+  import Logger => :logger
+  import VoteCounter => :election
+  import VoteCounter => :commit
 
   def initialize(cluster, options = {})
     @HOSTS = cluster.map {|x| [x]}
@@ -46,20 +49,20 @@ module Raft
     scratch :voted_for_in_current_step, [] => [:candidate]
     
     # log replication
-    #sync :logs, :dbm, [:index] => [:term, :command]
-    table :logs, [:index] => [:term, :command]
-
+    table :next_index, [:host] => [:index]
+    
     periodic :heartbeat, 0.1
   end
 
   bootstrap do
     members <= @HOSTS - [[ip_port]]
+    next_index <= members {|m| [m.host, 1]}
     st.reset_timer <= [[random_timeout]]
-    vc.setup <= [[@HOSTS.count]]
+    election.setup <= [[@HOSTS.count]]
   end
   
   bloom :module_input do
-    vc.count_votes <= st.current_term {|t| [t.term]}
+    election.count_votes <= st.current_term {|t| [t.term]}
   end
 
   bloom :timeout do
@@ -76,17 +79,18 @@ module Raft
       [random_timeout] if s.state != 'leader'
     end
     # vote for ourselves (have to do term + 1 because it hasn't been incremented yet)
-    vc.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
+    election.vote <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
       [t.term + 1, ip_port, true] if s.state != 'leader'
     end
     voted_for <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
       [t.term + 1, ip_port] if s.state != 'leader'
     end
+    # TODO: remove all uncommitted logs
   end
 
   bloom :send_vote_requests do
     vote_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
-      [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate' and not vc.voted.include?([t.term, m.host])
+      [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate' and not election.voted.include?([t.term, m.host])
     end
   end
 
@@ -97,11 +101,11 @@ module Raft
     end
     st.set_term <= vote_response.argmax([:term], :term) {|v| [v.term]}
     # record votes if we are in the correct term
-    vc.vote <= (st.current_state * vote_response * st.current_term).combos do |s, v, t|
+    election.vote <= (st.current_state * vote_response * st.current_term).combos do |s, v, t|
       [v.term, v.from, v.is_granted] if s.state == 'candidate' and v.term == t.term
     end
     # if we won the election, then we become leader
-    st.set_state <= (vc.race_won * st.current_state * st.current_term).combos do |e, s, t|
+    st.set_state <= (election.race_won * st.current_state * st.current_term).combos do |e, s, t|
       ['leader'] if s.state == 'candidate' and e.race == t.term
     end
   end
@@ -132,8 +136,8 @@ module Raft
 
   bloom :send_heartbeats do
     append_entries_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
-       # TODO: add legit indicies when we do logging
-      [m.host, ip_port, t.term, 0, 0, 0, 0] if s.state == 'leader'
+      # TODO: legit logging
+      [m.host, ip_port, t.term, 0, 0, nil, 0] if s.state == 'leader'
     end
   end
 

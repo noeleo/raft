@@ -48,18 +48,18 @@ table :current_term, [] => [:term]
 ```
 
 ### Vote Counter
-The vote counter counts votes and alerts when an election has been won in the specified term. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority in the specified term passed in.
+The vote counter counts votes and alerts when an election has been won in the specified race. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority in the specified race passed in.
 
 ```ruby
 interface :input, :setup, [] => [:num_voters]
-interface :input, :count_votes, [] => [:term]
-interface :input, :vote, [:term, :candidate] => [:is_granted]
-interface :output, :election_won, [:term]
+interface :input, :count_votes, [:race]
+interface :input, :vote, [:race, :candidate] => [:is_granted]
+interface :output, :election_won, [:race]
 ```
 
 The `voted` table can be useful to see who has voted (either granted or not granted).
 ```ruby
-table :voted, [:term, :candidate]
+table :voted, [:race, :candidate]
 ```
 
 ### Snooze Timer
