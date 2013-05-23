@@ -48,7 +48,7 @@ table :current_term, [] => [:term]
 ```
 
 ### Vote Counter
-The vote counter counts votes and alerts when an election has been won in the specified race. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority in the specified race passed in.
+The vote counter counts votes and alerts when an election has been won in the specified race. These are binary ballots in which on a particular "race", voters may vote yay or nay, and the majority wins. Initially, the number of voters must be passed in so that we know when a majority has been reached. When the `count_votes` input is used, the user is alerted when the election has been won by a majority.
 
 ```ruby
 interface :input, :setup, [] => [:num_voters]

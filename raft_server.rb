@@ -11,3 +11,4 @@ end
 port = ARGV[0].to_i
 cluster = ARGV[1..ARGV.length]
 server = RaftServer.new(cluster, :port => port)
+server.run_bg

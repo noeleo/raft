@@ -31,13 +31,16 @@ module Raft
   
   state do
     # client communication
-    channel :issue_command, [:@dest, :command]
+    # TODO: if this is not the leader, redirect to the leader
+    channel :send_command, [:@dest, :from, :command]
+    channel :reply_command, [:@dest, :response, :leader_redirect]
     
     # RPCs
     channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
     channel :vote_response, [:@dest, :from, :term, :is_granted]
     channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :entry, :commit_index]
-    channel :append_entries_response, [:@dest, :from, :term, :is_success]
+    # also send back the index so that we know which request is being acked
+    channel :append_entries_response, [:@dest, :from, :term, :index, :is_success]
 
     # leader election
     table :members, [:host]
@@ -47,6 +50,7 @@ module Raft
     
     # log replication
     table :next_index, [:host] => [:index]
+    scratch :preceding_logs, [:host] => [:index, :term]
     
     periodic :heartbeat, 0.1
   end
@@ -56,10 +60,14 @@ module Raft
     next_index <= members {|m| [m.host, 1]}
     st.reset_timer <= [[random_timeout]]
     election.setup <= [[@HOSTS.count]]
+    commit.setup <= [[@HOSTS.count]]
   end
   
   bloom :module_input do
+    logger.get_status <= [[true]]
     election.count_votes <= st.current_term {|t| [t.term]}
+    # count the votes of the next entry to be committed
+    commit.count_votes <= logger.last_committed {|i| [i.index + 1]}
   end
 
   bloom :timeout do
@@ -82,7 +90,8 @@ module Raft
     voted_for <= (st.alarm * st.current_state * st.current_term).combos do |a, s, t|
       [t.term + 1, ip_port] if s.state != 'leader'
     end
-    # TODO: remove all uncommitted logs
+    # remove all uncommitted logs
+    logger.remove_uncommitted_logs <= [[true]]
   end
 
   bloom :send_vote_requests do
@@ -132,9 +141,8 @@ module Raft
   end
 
   bloom :send_heartbeats do
-    append_entries_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
-      # TODO: legit logging
-      [m.host, ip_port, t.term, 0, 0, nil, 0] if s.state == 'leader'
+    append_entries_request <~ (heartbeat * members * st.current_state * st.current_term * logger.status).combos do |h, m, s, t, l|
+      [m.host, ip_port, t.term, l.last_index, l.last_term, nil, l.last_committed] if s.state == 'leader'
     end
   end
 
@@ -149,7 +157,36 @@ module Raft
     st.reset_timer <= (append_entries_request * st.current_term).pairs do |a, t|
       [random_timeout] if a.term >= t.term
     end
-    # TODO: respond to append entries
+    # respond with failure if no entry with this index
+    append_entries_response <~ (append_entries_request * logger.last_index * st.current_term).combos do |a, i, t|
+      [a.from, ip_port, t.term, a.prev_log_index + 1, false] if a.prev_log_index > i.index
+    end
+    # success only if log term matches
+    append_entries_response <~ (append_entries_request * logger.logs * st.current_term * st.current_state).combos do |a, l, t|
+      [a.from, ip_port, t.term, a.prev_log_index + 1, l.term == a.prev_log_term] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index
+    end
+    # TODO: update logs/remove them if they conflict
+    # TODO: update committed logs
+  end
+
+  bloom :handle_client_request do
+    # add it to the log
+    logger.add_log <= (send_command * st.current_state * st.current_term).pairs do |c, s, t|
+      [t.term, c.command] if s.state == 'leader'
+    end
+    # vote for it ourselves
+    commit.vote <= logger.added_log_index {|i| [i.index, ip_port, true]}
+  end
+
+  bloom :update_clients do
+    # find the preceding log metadata for all members
+    preceding_logs <= (logger.logs * next_index).pairs do |l, i|
+      [i.host, l.index, l.term] if s.state == 'leader' and l.index == i.index - 1
+    end
+    # append entries for all next indices
+    append_entries_request <~ (heartbeat * logger.logs * preceding_logs * logger.last_committed * st.current_term).combos do |h, l, p, c, t|
+      [p.host, ip_port, t.term, p.index, p.term, l.entry, c.index] if l.index == p.index + 1
+    end
   end
   
   bloom :leader_operation do
@@ -158,6 +195,19 @@ module Raft
       ['follower'] if a.term > t.term
     end
     st.set_term <= append_entries_response.argmax([:term], :term) {|a| [a.term]}
-    # TODO: receive responses to append_entries
+    # count only positive commit votes, so we can keep resending failures
+    commit.vote <= append_entries_response do |a|
+      [a.index, a.from, true] if a.is_success
+    end
+    # update next index depending on success/failure
+    next_index <+- (append_entries_response * next_index).pairs do |a, i|
+      puts "\n#{a.from}\n"
+      a.is_success ? [a.from, i.index + 1] : [a.from, i.index - 1]
+    end
+  end
+  
+  bloom :leader_commit_logs do
+    # commit the logs for which we received a majority vote
+    logger.commit_logs_before <= commit.race_won {|w| [w.race]}
   end
 end

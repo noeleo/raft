@@ -18,7 +18,7 @@ class TestLeaderElection < RaftTester
     assert get_states(server).include?('candidate')
     assert_equal 'leader', get_state(server)
     # send RPC with higher term to server
-    server.append_entries_request <~ [['127.0.0.1:54321', '127.0.0.1:54322', 10, 0, 0, 0, 0]]
+    server.append_entries_request <~ [['127.0.0.1:54321', '127.0.0.1:54322', 10, 0, 0, nil, 0]]
     sleep 0.5
     # server should now have updated its term and reverted to follower state
     assert_equal 10, get_term(server)
