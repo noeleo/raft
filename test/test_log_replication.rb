@@ -21,7 +21,7 @@ class TestLogReplication < RaftTester
     leader.send_command <~ [[leader.ip_port, 'me', 'add']]
     sleep 1
     @servers.each do |s|
-      puts "#{@servers.index(s)} and #{s.logger.logs.inspected} ok"
+      logs = Logs.new(s.logger.logs)
     end
   end
 end
