@@ -31,7 +31,7 @@ module Raft
   
   state do
     # client communication
-    # TODO: if this is not the leader, redirect to the leader
+    # TODO: if this is not the leader, redirect to the leader (need to store him)
     channel :send_command, [:@dest, :from, :command]
     channel :reply_command, [:@dest, :response, :leader_redirect]
     
@@ -125,7 +125,6 @@ module Raft
     end
     st.set_term <= vote_request.argmax([], :term) {|v| [v.term]}
     # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
-    # TODO: make this so that we will respond with true if we already granted a vote for this server (in case network drops packet)
     voted_for_in_current_term <= (voted_for * st.current_term).pairs(:term => :term) do |v, t|
       [v.candidate]
     end
@@ -215,7 +214,6 @@ module Raft
     next_index <+- (append_entries_response * next_index).pairs(:from => :host) do |a, i|
       a.is_success ? [a.from, i.index + 1] : [a.from, i.index - 1]
     end
-    stdio <~ next_index.inspected
   end
   
   bloom :leader_commit_logs do

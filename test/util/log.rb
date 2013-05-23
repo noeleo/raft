@@ -1,22 +1,40 @@
+class Log
+  def initialize(log)
+    @log = log
+  end
+  
+  def term
+    @log[1]
+  end
+  
+  def entry
+    @log[2]
+  end
+  
+  def is_committed
+    @log[3]
+  end
+end
+
 class Logs
   def initialize(logs)
-    @logs = logs.inspected
-    puts @logs
+    @logs = logs.to_a
+    @logs.sort_by!{|l| l[0]}
+  end
+  
+  def ==(other_object)
+    @logs == other_object.logs
+  end
+  
+  def logs
+    @logs
   end
   
   def contains_index(index)
-    logs.keys.map{|k| k[0]}.include?(index)
+    @logs[index] != nil
   end
   
-  def term(index)
-    logs.select{|l| l.values.select{|v| v[0] == index}.first
-  end
-  
-  def entry(index)
-    logs.values[index][1]
-  end
-  
-  def is_committed(index)
-    logs.values[index][2]
+  def index(index)
+    Log.new @logs.select{|l| l[0] == index}.first
   end
 end
