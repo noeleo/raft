@@ -91,7 +91,9 @@ module Raft
       [t.term + 1, ip_port] if s.state != 'leader'
     end
     # remove all uncommitted logs
-    logger.remove_uncommitted_logs <= [[true]]
+    logger.remove_uncommitted_logs <= (st.alarm * st.current_state).pairs do |a, s|
+      [true] if s.state != 'leader'
+    end
   end
 
   bloom :send_vote_requests do
@@ -128,13 +130,17 @@ module Raft
       [v.candidate]
     end
     voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
+    # grant the vote if we haven't voted for anyone else OR if this is the server we already voted for
     vote_response <~ (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
-      [r.from, ip_port, t.term, (r.from == v.candidate and not voted_for_in_current_term.exists?)]
+      grant_vote = (r.from == v.candidate and not voted_for_in_current_term.exists?) or voted_for_in_current_term.include?([r.from])
+      [r.from, ip_port, t.term, grant_vote]
     end
     # reset the timer if we grant a vote to a candidate
     st.reset_timer <= (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
-      [random_timeout] if r.from == v.candidate and not voted_for_in_current_term.exists?
+      grant_vote = (r.from == v.candidate and not voted_for_in_current_term.exists?) or voted_for_in_current_term.include?([r.from])
+      [random_timeout] if grant_vote
     end
+    # update if we hadn't voted for anyone before
     voted_for <+ (voted_for_in_current_step * st.current_term).pairs do |v, t|
       [t.term, v.candidate] if not voted_for_in_current_term.exists?
     end
@@ -142,7 +148,7 @@ module Raft
 
   bloom :send_heartbeats do
     append_entries_request <~ (heartbeat * members * st.current_state * st.current_term * logger.status).combos do |h, m, s, t, l|
-      [m.host, ip_port, t.term, l.last_index, l.last_term, -1, l.last_committed] if s.state == 'leader'
+      [m.host, ip_port, t.term, l.last_index, l.last_term, nil, l.last_committed] if s.state == 'leader'
     end
   end
 
@@ -162,10 +168,14 @@ module Raft
       [a.from, ip_port, t.term, a.prev_log_index + 1, false] if a.prev_log_index > i.last_index
     end
     # success only if log term matches
-    append_entries_response <~ (append_entries_request * logger.logs * st.current_term * st.current_state).combos do |a, l, t|
-      [a.from, ip_port, t.term, a.prev_log_index + 1, l.term == a.prev_log_term] if a.entry != -1 and s.state != 'leader' and l.index == a.prev_log_index
+    append_entries_response <~ (append_entries_request * logger.logs * st.current_state).combos do |a, l, s|
+      [a.from, ip_port, a.term, a.prev_log_index + 1, l.term == a.prev_log_term] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index
     end
-    # TODO: update logs/remove them if they conflict
+    # TODO: remove logs if they conflict
+    # update logs if success
+    logger.add_log <= (append_entries_request * logger.logs * logger.status * st.current_state).combos do |a, l, stat, s|
+      [a.term, a.entry] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index and l.term == a.prev_log_term
+    end
     # update committed logs
     temp :max_committed <= append_entries_request.argmax([], :commit_index)
     logger.commit_logs_before <= max_committed {|m| [m.commit_index]}
@@ -187,7 +197,7 @@ module Raft
     end
     # append entries for all next indices
     append_entries_request <~ (heartbeat * logger.logs * preceding_logs * logger.status * st.current_term).combos do |h, l, p, s, t|
-      [p.host, ip_port, t.term, p.index, p.term, l.entry, c.index] if s.last_committed == p.index + 1
+      [p.host, ip_port, t.term, p.index, p.term, l.entry, s.last_committed] if l.index == p.index + 1
     end
   end
   
@@ -202,10 +212,10 @@ module Raft
       [a.index, a.from, true] if a.is_success
     end
     # update next index depending on success/failure
-    next_index <+- (append_entries_response * next_index).pairs do |a, i|
-      puts "\n#{a.from}\n"
+    next_index <+- (append_entries_response * next_index).pairs(:from => :host) do |a, i|
       a.is_success ? [a.from, i.index + 1] : [a.from, i.index - 1]
     end
+    stdio <~ next_index.inspected
   end
   
   bloom :leader_commit_logs do

@@ -23,6 +23,11 @@ module Logger
   bootstrap do
     logs <= [[0, 0, nil, true]]
   end
+  
+  bloom :debug do
+    stdio <~ remove_uncommitted_logs.inspected
+    #stdio <~ remove_logs_after.inspected
+  end
 
   bloom :remove_logs do
     logs <- (remove_logs_after * logs).pairs do |r, l|
