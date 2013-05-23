@@ -4,10 +4,10 @@ require 'bud'
 module LoggerProtocol
   state do
     interface :input, :get_status , [] => [:ok]
-    interface :input, :add_log, [] => [:term, :entry, :is_committed]
+    interface :input, :add_log, [] => [:term, :entry]
     interface :input, :commit_logs_before, [] => [:index]
     interface :input, :remove_logs_after, [] => [:index]
-    interface :input, :remove_uncommitted, [] => [:ok]
+    interface :input, :remove_uncommitted_logs, [] => [:ok]
     interface :output, :status, [] => [:last_index, :last_term, :last_committed]
   end
 end
@@ -28,9 +28,9 @@ module Logger
   
   bloom :remove_logs do
     logs <- (remove_logs_after * logs).pairs do |r, l|
-      l if l.index > r.index
+      l if l.index >= r.index
     end
-    logs <- (remove_uncommitted * logs).pairs do |r, l|
+    logs <- (remove_uncommitted_logs * logs).pairs do |r, l|
       l unless l.is_committed
     end
   end
@@ -46,7 +46,7 @@ module Logger
   bloom :add do
     temp :single_log <= add_log.argagg(:choose, [], :term)
     logs <= (single_log * last_index).pairs do |a, i|
-      [i.index + 1, a.term, a.entry, a.is_committed]
+      [i.index + 1, a.term, a.entry, false]
     end
   end
   
