@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 
-require 'snooze_timer'
+require 'src/snooze_timer'
 
 class RealSnoozeTimer
   include Bud

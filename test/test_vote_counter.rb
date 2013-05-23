@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 
-require 'vote_counter'
+require 'src/vote_counter'
 
 class RealVoteCounter
   include Bud

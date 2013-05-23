@@ -1,7 +1,4 @@
-require 'rubygems'
-require 'bud'
-
-require 'snooze_timer'
+require 'src/snooze_timer'
 
 module ServerStateProtocol
   state do

@@ -1,9 +1,6 @@
-require 'rubygems'
-require 'bud'
-
-require 'server_state'
-require 'logger'
-require 'vote_counter'
+require 'src/server_state'
+require 'src/logger'
+require 'src/vote_counter'
 
 module RaftProtocol
 end

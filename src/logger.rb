@@ -1,6 +1,3 @@
-require 'rubygems'
-require 'bud'
-
 module LoggerProtocol
   state do
     interface :input, :get_status , [] => [:ok]

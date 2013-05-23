@@ -1,6 +1,3 @@
-require 'rubygems'
-require 'bud'
-
 module VoteCounterProtocol
   state do
     interface :input, :setup, [] => [:num_voters]

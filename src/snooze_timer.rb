@@ -1,6 +1,3 @@
-require 'rubygems'
-require 'bud'
-
 require 'time'
 
 module SnoozeTimerProtocol

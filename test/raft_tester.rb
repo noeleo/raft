@@ -1,7 +1,8 @@
 require 'rubygems'
 require 'bud'
+
 require 'test/unit'
-require 'raft'
+require 'src/raft'
 
 class RealRaft
   include Bud

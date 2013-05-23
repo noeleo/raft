@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 
-require 'server_state'
+require 'src/server_state'
 
 class RealServerState
   include Bud

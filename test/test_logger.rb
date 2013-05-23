@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bud'
 require 'test/unit'
 
-require 'logger'
+require 'src/logger'
 
 class RealLogger
   include Bud
