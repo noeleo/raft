@@ -1,7 +1,7 @@
 module LoggerProtocol
   state do
     interface :input, :get_status , [] => [:ok]
-    # if replace_index is not nil, we 
+    # if replace_index is not nil, we insert at replace_index and remove all following entries
     interface :input, :add_log, [] => [:term, :entry, :replace_index]
     interface :input, :commit_logs_before, [] => [:index]
     interface :input, :remove_uncommitted_logs, [] => [:ok]

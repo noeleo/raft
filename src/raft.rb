@@ -51,6 +51,7 @@ module Raft
     # log replication
     table :next_index, [:host] => [:index]
     scratch :preceding_logs, [:host] => [:index, :term]
+    scratch :potential_candidates, vote_request.schema
     
     periodic :heartbeat, 0.1
   end
@@ -124,11 +125,16 @@ module Raft
       ['follower'] if (s.state == 'candidate' or s.state == 'leader') and v.term > t.term
     end
     st.set_term <= vote_request.argmax([], :term) {|v| [v.term]}
-    # TODO: if voted_for in current term is null AND the candidate's log is at least as complete as our local log, then grant our vote, reject others, and reset the election timeout
     voted_for_in_current_term <= (voted_for * st.current_term).pairs(:term => :term) do |v, t|
       [v.candidate]
     end
-    voted_for_in_current_step <= vote_request.argagg(:choose, [], :from) {|v| [v.from]}
+    # can only be potential candidate if the candidate's log is at least as complete as our local log
+    potential_candidates <= (vote_request * logger.status).pairs do |v, l|
+      condition_1 = (v.last_log_term > l.last_term)
+      condition_2 = (v.last_log_term == l.last_term and v.last_log_index >= l.last_index)
+      v if condition_1 or condition_2
+    end
+    voted_for_in_current_step <= potential_candidates.argagg(:choose, [], :from) {|v| [v.from]}
     # grant the vote if we haven't voted for anyone else OR if this is the server we already voted for
     vote_response <~ (vote_request * voted_for_in_current_step * st.current_term).combos do |r, v, t|
       grant_vote = (r.from == v.candidate and not voted_for_in_current_term.exists?) or voted_for_in_current_term.include?([r.from])

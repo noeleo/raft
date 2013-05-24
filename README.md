@@ -57,11 +57,11 @@ table :current_term, [] => [:term]
 ```
 
 ### Logger
-The logger keeps track of all logs. The inputs are self-explanatory. `add_log` also outputs the index of the log just added via `added_log_index`.
+The logger keeps track of all logs. The inputs are self-explanatory. `add_log` also outputs the index of the log just added via `added_log_index`, and if `replace_index` is not nil, the entry is inserted at the given index and all following entries are removed.
 
 ```ruby
 interface :input, :get_status , [] => [:ok]
-interface :input, :add_log, [] => [:term, :entry]
+interface :input, :add_log, [] => [:term, :entry, :replace_index]
 interface :input, :commit_logs_before, [] => [:index]
 interface :input, :remove_logs_after, [] => [:index]
 interface :input, :remove_uncommitted_logs, [] => [:ok]
