@@ -1,9 +1,9 @@
 module LoggerProtocol
   state do
     interface :input, :get_status , [] => [:ok]
-    interface :input, :add_log, [] => [:term, :entry]
+    # if replace_index is not nil, we 
+    interface :input, :add_log, [] => [:term, :entry, :replace_index]
     interface :input, :commit_logs_before, [] => [:index]
-    interface :input, :remove_logs_after, [] => [:index]
     interface :input, :remove_uncommitted_logs, [] => [:ok]
     interface :output, :status, [] => [:last_index, :last_term, :last_committed]
     interface :output, :added_log_index, [] => [:index]
@@ -18,6 +18,9 @@ module Logger
     scratch :last_index, [] => [:index]
     scratch :last_term, [] => [:term]
     scratch :last_committed, [] => [:index]
+    
+    scratch :single_log, add_log.schema
+    scratch :possible_update_points, [:index]
   end
 
   bootstrap do
@@ -25,9 +28,6 @@ module Logger
   end
 
   bloom :remove_logs do
-    logs <- (remove_logs_after * logs).pairs do |r, l|
-      l if l.index >= r.index
-    end
     logs <- (remove_uncommitted_logs * logs).pairs do |r, l|
       l unless l.is_committed
     end
@@ -42,18 +42,26 @@ module Logger
   end
 
   bloom :add do
-    temp :single_log <= add_log.argagg(:choose, [], :term)
-    logs <= (single_log * last_index).pairs do |a, i|
-      [i.index + 1, a.term, a.entry, false]
+    single_log <= add_log.argagg(:choose, [], :term)
+    # remove all logs after the one we are inserting
+    logs <- (single_log * logs).pairs do |a, l|
+      l if a.replace_index and l.index >= a.replace_index
+    end
+    logs <+ (single_log * last_index).pairs do |a, i|
+      [a.replace_index ? a.replace_index : i.index + 1, a.term, a.entry, false]
     end
     added_log_index <= (single_log * last_index).pairs do |a, i|
-      [i.index + 1]
+      [a.replace_index ? a.replace_index : i.index + 1]
     end
   end
-
+  
   bloom :commit do
-    logs <+- (commit_logs_before * logs).pairs do |c, l|
-      [l.index, l.term, l.entry, true] if l.index <= c.index
+    # only update the logs that are not going to be deleted
+    possible_update_points <= last_index {|i| [i.index]}
+    possible_update_points <= single_log {|a| [a.replace_index-1] if a.replace_index}
+    temp :update_before <= possible_update_points.argmin([], :index)
+    logs <+- (commit_logs_before * update_before * logs).pairs do |c, u, l|
+      [l.index, l.term, l.entry, true] if l.index <= u.index and l.index <= c.index
     end
   end
 

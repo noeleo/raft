@@ -19,7 +19,7 @@ class TestLogReplication < RaftTester
     assert leader != nil
     # send the leader a log and make sure it gets replicated
     leader.send_command <~ [[leader.ip_port, 'me', 'add']]
-    sleep 1
+    sleep 2
     leader_logs = Logs.new leader.logger.logs
     assert leader_logs.contains_index(1)
     assert_equal 'add', leader_logs.index(1).entry
@@ -44,10 +44,41 @@ class TestLogReplication < RaftTester
     end
     stopped.each {|s| @servers.delete(s)}
     leader.send_command <~ [[leader.ip_port, 'me', 'add']]
-    sleep 1
+    sleep 2
     leader_logs = Logs.new leader.logger.logs
     assert leader_logs.contains_index(1)
     assert (not leader_logs.index(1).is_committed)
+    @servers.each do |s|
+      assert leader_logs == Logs.new(s.logger.logs)
+    end
+  end
+  
+  def test_remove_conflicting_logs
+    start_servers(5)
+    sleep 5
+    leader = @servers.select {|s| get_state(s) == 'leader'}.first
+    assert leader != nil
+    leader_index = @servers.index(leader)
+    # put in some entries into a follower
+    bad_server_index = ((0..4).to_a - [leader_index])[rand(4)]
+    bad_server = @servers[bad_server_index]
+    bad_server.sync_do { bad_server.logger.add_log <+ [[-1, 'bad entry']]}
+    sleep 0.5
+    bad_server.sync_do { bad_server.logger.add_log <+ [[-1, 'another bad entry']]}
+    sleep 0.5
+    bad_logs = Logs.new bad_server.logger.logs
+    assert bad_logs.contains_index(1)
+    assert_equal -1, bad_logs.index(1).term
+    assert_equal 'bad entry', bad_logs.index(1).entry
+    assert bad_logs.contains_index(2)
+    assert_equal -1, bad_logs.index(2).term
+    assert_equal 'another bad entry', bad_logs.index(2).entry
+    assert_equal 3, bad_server.logger.logs.count
+    assert_equal 1, leader.logger.logs.count
+    # now add an entry to the leader and make sure the bad server updates itself
+    leader.send_command <~ [[leader.ip_port, 'me', 'good entry']]
+    sleep 2
+    leader_logs = Logs.new leader.logger.logs
     @servers.each do |s|
       assert leader_logs == Logs.new(s.logger.logs)
     end

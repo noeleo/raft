@@ -10,10 +10,12 @@ class RealLogger
 
   state do
     table :stati, [:time] => [:last_index, :last_term, :last_committed]
+    table :added_indices, [:time] => [:index]
   end
 
   bloom do
     stati <= status {|s| [budtime, s.last_index, s.last_term, s.last_committed]}
+    added_indices <= added_log_index {|a| [budtime, a.index]}
   end
 end
 
@@ -57,6 +59,7 @@ class TestLogger < Test::Unit::TestCase
     @logger.sync_do { @logger.add_log <+ [[1, 'code']]}
     @logger.sync_do { @logger.add_log <+ [[2, 'sleep']]}
     assert_status 3, 2, 0
+    assert_equal 3, @logger.added_indices.count
     @logger.sync_do { @logger.commit_logs_before <+ [[2]]}
     assert_status 3, 2, 2
     @logger.sync_do { @logger.add_log <+ [[6, 'cool']]}
@@ -65,15 +68,16 @@ class TestLogger < Test::Unit::TestCase
     assert_equal 4, num_logs
   end
   
-  def test_remove_logs_after
+  def test_replacing_logs
     @logger.sync_do { @logger.add_log <+ [[1, 'eat']] }
     @logger.sync_do { @logger.add_log <+ [[1, 'eat']] }
     @logger.sync_do { @logger.add_log <+ [[7, 'eat']] }
     @logger.sync_do { @logger.add_log <+ [[8, 'eat']] }
     @logger.sync_do { @logger.add_log <+ [[9, 'eat']] }
     assert_status 5, 9, 0
-    @logger.sync_do { @logger.remove_logs_after <+ [[4]]}
-    assert_status 3, 7, 0
+    # replace log 3 with this and remove all elements after
+    @logger.sync_do { @logger.add_log <+ [[5, 'sleep', 3]]}
+    assert_status 3, 5, 0
     assert_equal 3, num_logs
   end
   

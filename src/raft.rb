@@ -162,7 +162,7 @@ module Raft
     st.reset_timer <= (append_entries_request * st.current_term).pairs do |a, t|
       [random_timeout] if a.term >= t.term
     end
-    # respond with failure if no entry with this index
+    # respond with failure if the previous entry doesn't exist in our log
     append_entries_response <~ (append_entries_request * logger.status * st.current_term).combos do |a, i, t|
       [a.from, ip_port, t.term, a.prev_log_index + 1, false] if a.prev_log_index > i.last_index
     end
@@ -170,10 +170,9 @@ module Raft
     append_entries_response <~ (append_entries_request * logger.logs * st.current_state).combos do |a, l, s|
       [a.from, ip_port, a.term, a.prev_log_index + 1, l.term == a.prev_log_term] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index
     end
-    # TODO: remove logs if they conflict
-    # update logs if success
+    # update logs if terms match, replace/delete all entries after
     logger.add_log <= (append_entries_request * logger.logs * logger.status * st.current_state).combos do |a, l, stat, s|
-      [a.term, a.entry] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index and l.term == a.prev_log_term
+      [a.term, a.entry, a.prev_log_index + 1] if a.entry != nil and s.state != 'leader' and l.index == a.prev_log_index and l.term == a.prev_log_term
     end
     # update committed logs
     temp :max_committed <= append_entries_request.argmax([], :commit_index)
