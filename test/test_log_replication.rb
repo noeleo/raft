@@ -18,7 +18,7 @@ class TestLogReplication < RaftTester
     leader = @servers.select {|s| get_state(s) == 'leader'}.first
     assert leader != nil
     # send the leader a log and make sure it gets replicated
-    leader.send_command <~ [[leader.ip_port, 'me', 'add']]
+    leader.sync_do { leader.send_command <+ [['add']] }
     sleep 2
     leader_logs = Logs.new leader.logger.logs
     assert leader_logs.contains_index(1)
@@ -43,7 +43,7 @@ class TestLogReplication < RaftTester
       stopped << s
     end
     stopped.each {|s| @servers.delete(s)}
-    leader.send_command <~ [[leader.ip_port, 'me', 'add']]
+    leader.sync_do { leader.send_command <+ [['add']] }
     sleep 2
     leader_logs = Logs.new leader.logger.logs
     assert leader_logs.contains_index(1)
@@ -76,7 +76,7 @@ class TestLogReplication < RaftTester
     assert_equal 3, bad_server.logger.logs.count
     assert_equal 1, leader.logger.logs.count
     # now add an entry to the leader and make sure the bad server updates itself
-    leader.send_command <~ [[leader.ip_port, 'me', 'good entry']]
+    leader.sync_do { leader.send_command <+ [['good entry']] }
     sleep 2
     leader_logs = Logs.new leader.logger.logs
     @servers.each do |s|

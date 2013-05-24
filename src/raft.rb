@@ -33,8 +33,10 @@ module Raft
   
   state do
     # client communication
-    channel :send_command, [:@dest, :from, :command]
-    channel :reply_command, [:@dest, :response, :leader_redirect]
+    #channel :send_command, [:@dest, :from, :command]
+    #channel :reply_command, [:@dest, :response, :leader_redirect]
+    interface :input, :send_command, [:command]
+    interface :output, :reply_command, [:response, :leader_redirect]
     
     # RPCs
     channel :vote_request, [:@dest, :from, :term, :last_log_index, :last_log_term]
@@ -43,8 +45,8 @@ module Raft
     # also send back the index so that we know which request is being acked
     channel :append_entries_response, [:@dest, :from, :term, :index, :is_success]
     
-    # clients
-    table :respond_to, [:index] => [:client]
+    # clients: used for network communication
+    #table :respond_to, [:index] => [:client]
     
     # leader election
     table :members, [:host]
@@ -195,33 +197,6 @@ module Raft
     logger.commit_logs_before <= max_committed {|m| [m.commit_index]}
   end
 
-  bloom :handle_client_request do
-    # add it to the log
-    logger.add_log <= (send_command * st.current_state * st.current_term).pairs do |c, s, t|
-      [t.term, c.command] if s.state == 'leader'
-    end
-    # vote for it ourselves
-    commit.vote <= logger.added_log_index {|i| [i.index, ip_port, true]}
-    # wait for a commit
-    temp :single_command <= send_command.argagg(:max, [], :command)
-    respond_to <+- (single_command * logger.added_log_index).pairs do |c, i|
-      [c.from, i.index]
-    end
-  end
-  
-  bloom :client_responses do
-    # send committed logs into the state machine to execute
-    machine.execute <= logger.commited_logs
-    # respond to committed command if you are the leader
-    reply_command <~ (machine.result * respond_to * st.current_state).combos do |r, a, s|
-      [a.client, r.result] if s.state == 'leader' and a.index == r.index
-    end
-    # respond with leader if you are not the leader
-    #reply_command <~ (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
-    #  [c.from, nil, l.leader] if s.state != 'leader'
-    #end
-  end
-
   bloom :update_servers do
     # find the preceding log metadata for all members
     preceding_logs <= (logger.logs * next_index * st.current_state).pairs do |l, i, s|
@@ -252,5 +227,40 @@ module Raft
   bloom :leader_commit_logs do
     # commit the logs for which we received a majority vote
     logger.commit_logs_before <= commit.race_won {|w| [w.race]}
+  end
+  
+  bloom :handle_client_request do
+    # add it to the log
+    logger.add_log <= (send_command * st.current_state * st.current_term).pairs do |c, s, t|
+      [t.term, c.command] if s.state == 'leader'
+    end
+    # vote for it ourselves
+    commit.vote <= logger.added_log_index {|i| [i.index, ip_port, true]}
+    # NETWORK: wait for a commit
+    #temp :single_command <= send_command.argmax([], :command)
+    #respond_to <+- (single_command * logger.added_log_index).pairs do |c, i|
+    #  [c.from, i.index]
+    #end
+  end
+  
+  bloom :client_responses do
+    # send committed logs into the state machine to execute
+    machine.execute <= logger.committed_logs
+    # NETWORK: respond to committed command if you are the leader
+    #reply_command <~ (machine.result * respond_to * st.current_state).combos do |r, a, s|
+    #  [a.client, r.result] if s.state == 'leader' and a.index == r.index
+    #end
+    # NETWORK: respond with leader if you are not the leader
+    #reply_command <~ (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
+    #  [c.from, nil, l.leader] if s.state != 'leader'
+    #end
+    # respond to committed command if you are the leader
+    reply_command <= (machine.result * st.current_state).combos do |r, s|
+      [r.result] if s.state == 'leader'
+    end
+    # respond with leader if you are not the leader
+    reply_command <= (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
+      [nil, l.leader] if s.state != 'leader'
+    end
   end
 end

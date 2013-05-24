@@ -10,10 +10,12 @@ class RealRaft
 
   state do
     table :states, [:timestamp] => [:state, :term]
+    table :replies, [:timestamp] => [:response, :leader_redirect]
   end
 
   bloom do
     states <= (st.current_state * st.current_term).pairs {|s, t| [budtime, s.state, t.term]}
+    replies <= reply_command {|r| [budtime, r.response, r.leader_redirect]}
   end
 end
 
