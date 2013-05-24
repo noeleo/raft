@@ -1,6 +1,7 @@
 require 'src/server_state'
 require 'src/logger'
 require 'src/vote_counter'
+require 'src/state_machine'
 
 module RaftProtocol
 end
@@ -11,6 +12,7 @@ module Raft
   import Logger => :logger
   import VoteCounter => :election
   import VoteCounter => :commit
+  import StateMachine => :machine
 
   def initialize(cluster, options = {})
     @HOSTS = cluster.map {|x| [x]}
@@ -31,7 +33,6 @@ module Raft
   
   state do
     # client communication
-    # TODO: if this is not the leader, redirect to the leader (need to store him)
     channel :send_command, [:@dest, :from, :command]
     channel :reply_command, [:@dest, :response, :leader_redirect]
     
@@ -41,7 +42,10 @@ module Raft
     channel :append_entries_request, [:@dest, :from, :term, :prev_log_index, :prev_log_term, :entry, :commit_index]
     # also send back the index so that we know which request is being acked
     channel :append_entries_response, [:@dest, :from, :term, :index, :is_success]
-
+    
+    # clients
+    table :respond_to, [:index] => [:client]
+    
     # leader election
     table :members, [:host]
     table :voted_for, [:term] => [:candidate]
@@ -70,6 +74,12 @@ module Raft
     # count the votes of the next entry to be committed
     commit.count_votes <= logger.status {|l| [l.last_committed + 1]}
   end
+  
+  # this isn't fully accurate but will eventually be correct in stable operation
+  bloom :determine_leader do
+    st.set_leader <= st.current_state {|s| [ip_port] if s.state == 'leader'}
+    st.set_leader <= append_entries_request {|a| [a.from]}
+  end
 
   bloom :timeout do
     # increment current term
@@ -77,11 +87,11 @@ module Raft
       [t.term + 1] if s.state != 'leader'
     end
     # transition to candidate state
-    st.set_state <= (st.alarm * st.current_state).pairs do |t, s|
+    st.set_state <= (st.alarm * st.current_state).pairs do |a, s|
       ['candidate'] if s.state != 'leader'
     end
     # reset the timer
-    st.reset_timer <= (st.alarm * st.current_state).pairs do |a|
+    st.reset_timer <= (st.alarm * st.current_state).pairs do |a, s|
       [random_timeout] if s.state != 'leader'
     end
     # vote for ourselves (have to do term + 1 because it hasn't been incremented yet)
@@ -192,9 +202,27 @@ module Raft
     end
     # vote for it ourselves
     commit.vote <= logger.added_log_index {|i| [i.index, ip_port, true]}
+    # wait for a commit
+    temp :single_command <= send_command.argagg(:max, [], :command)
+    respond_to <+- (single_command * logger.added_log_index).pairs do |c, i|
+      [c.from, i.index]
+    end
+  end
+  
+  bloom :client_responses do
+    # send committed logs into the state machine to execute
+    machine.execute <= logger.commited_logs
+    # respond to committed command if you are the leader
+    reply_command <~ (machine.result * respond_to * st.current_state).combos do |r, a, s|
+      [a.client, r.result] if s.state == 'leader' and a.index == r.index
+    end
+    # respond with leader if you are not the leader
+    reply_command <~ (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
+      [c.from, nil, l.leader] if s.state != 'leader'
+    end
   end
 
-  bloom :update_clients do
+  bloom :update_servers do
     # find the preceding log metadata for all members
     preceding_logs <= (logger.logs * next_index * st.current_state).pairs do |l, i, s|
       [i.host, l.index, l.term] if s.state == 'leader' and l.index == i.index - 1

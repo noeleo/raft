@@ -4,6 +4,7 @@ module ServerStateProtocol
   state do
     interface :input, :set_state, [:state]
     interface :input, :set_term, [:term]
+    interface :input, :set_leader, [:leader]
     interface :input, :reset_timer, [:time_out]
     interface :output, :alarm, [] => [:time_out]
   end
@@ -19,11 +20,13 @@ module ServerState
   state do
     table :current_state, [] => [:state]
     table :current_term, [] => [:term]
+    table :current_leader, [] => [:leader]
   end
 
   bootstrap do
     current_term <= [[1]]
     current_state <= [['follower']]
+    current_leader <= [[nil]]
   end
 
   bloom :manage_state do
@@ -41,6 +44,11 @@ module ServerState
     current_term <+- (final_term * current_term).pairs do |f, c|
       [f.term] if f.term > c.term
     end
+  end
+  
+  bloom :manage_leader do
+    temp :final_leader <= set_leader.argagg(:max, [], :leader)
+    current_leader <+- final_leader {|f| [f.leader]}
   end
   
   bloom :manage_timer do

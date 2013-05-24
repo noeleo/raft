@@ -7,6 +7,7 @@ module LoggerProtocol
     interface :input, :remove_uncommitted_logs, [] => [:ok]
     interface :output, :status, [] => [:last_index, :last_term, :last_committed]
     interface :output, :added_log_index, [] => [:index]
+    interface :output, :committed_logs, [:index] => [:entry]
   end
 end
 
@@ -42,7 +43,7 @@ module Logger
   end
 
   bloom :add do
-    single_log <= add_log.argagg(:choose, [], :term)
+    single_log <= add_log.argagg(:max, [], :entry)
     # remove all logs after the one we are inserting
     logs <- (single_log * logs).pairs do |a, l|
       l if a.replace_index and l.index >= a.replace_index
@@ -60,8 +61,11 @@ module Logger
     possible_update_points <= last_index {|i| [i.index]}
     possible_update_points <= single_log {|a| [a.replace_index-1] if a.replace_index}
     temp :update_before <= possible_update_points.argmin([], :index)
-    logs <+- (commit_logs_before * update_before * logs).pairs do |c, u, l|
-      [l.index, l.term, l.entry, true] if l.index <= u.index and l.index <= c.index
+    logs <+- (commit_logs_before * update_before * last_committed * logs).pairs do |b, u, c, l|
+      [l.index, l.term, l.entry, true] if l.index <= u.index and l.index <= b.index and l.index > c.index
+    end
+    committed_logs <= (commit_logs_before * update_before * last_committed * logs).pairs do |b, u, c, l|
+      [l.index, l.entry] if l.index <= u.index and l.index <= b.index and l.index > c.index
     end
   end
 

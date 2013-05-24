@@ -11,11 +11,13 @@ class RealLogger
   state do
     table :stati, [:time] => [:last_index, :last_term, :last_committed]
     table :added_indices, [:time] => [:index]
+    table :time_commited_logs, [:time, :index] => [:entry]
   end
 
   bloom do
     stati <= status {|s| [budtime, s.last_index, s.last_term, s.last_committed]}
     added_indices <= added_log_index {|a| [budtime, a.index]}
+    time_commited_logs <= committed_logs {|c| [budtime, c.index, c.entry]}
   end
 end
 
@@ -62,8 +64,10 @@ class TestLogger < Test::Unit::TestCase
     assert_equal 3, @logger.added_indices.count
     @logger.sync_do { @logger.commit_logs_before <+ [[2]]}
     assert_status 3, 2, 2
+    assert_equal 2, @logger.time_commited_logs.count
     @logger.sync_do { @logger.add_log <+ [[6, 'cool']]}
     @logger.sync_do { @logger.commit_logs_before <+ [[4]]}
+    assert_equal 4, @logger.time_commited_logs.count
     assert_status 4, 6, 4
     assert_equal 4, num_logs
   end

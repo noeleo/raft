@@ -11,12 +11,14 @@ class RealServerState
   state do
     table :states, [:time] => [:state]
     table :terms, [:time] => [:term]
+    table :leaders, [:time] => [:leader]
     table :alarms, [:time] => [:time_out]
   end
 
   bloom do
     states <= current_state {|s| [budtime, s.state]}
     terms <= current_term {|s| [budtime, s.term]}
+    leaders <= current_leader {|s| [budtime, s.leader]}
     alarms <= alarm {|a| [budtime, a.time_out]}
   end
 end
