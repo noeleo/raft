@@ -217,9 +217,9 @@ module Raft
       [a.client, r.result] if s.state == 'leader' and a.index == r.index
     end
     # respond with leader if you are not the leader
-    reply_command <~ (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
-      [c.from, nil, l.leader] if s.state != 'leader'
-    end
+    #reply_command <~ (send_command * st.current_leader * st.current_state).pairs do |c, l, s|
+    #  [c.from, nil, l.leader] if s.state != 'leader'
+    #end
   end
 
   bloom :update_servers do
