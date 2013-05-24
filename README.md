@@ -111,30 +111,7 @@ ruby -I. test/test_snooze_timer.rb
 
 NOTE: The effectiveness of election timeouts are dependent on processor speed. Running on a single 2.26 Ghz Core 2 Duo, the timeouts run well at the default 300-600ms.
 
-Below are some of the tests in our suite. Note that this is most likely not complete.
-
-### Timer Tests
-The test suite for the SnoozeTimer module is in test_timer.rb. These tests test the following cases:
-  1. Testing the Alarm Going Off: A timer is set for 3 seconds. We check to see whether a timer does not go off within a second of setting the timer on. 3.5 seconds after turning on the timer we check to see that it has gone off.
-  2. Testing Multiple Timers: We create 2 timers with 3 seconds each. We check to see that both alarms go off after 3 seconds of creation.
-  3. Testing Reset of Alarms: We set an alarm for 3 seconds. We wait for 1.5 seconds and make sure the alarm does not go off. We then reset the alarm and make sure it goes off 3.5 seconds of the alarm going off.
-  4. Test Multiple Timers at Same Tick: We set a timer for 3 seconds. We wait 4 seconds to make surethe timer goes off.
-
-### Server State Tests
-The test suite for the Server State module is in test_server_state.rb. These tests test the following cases:
-  1. Test one Server State: We create a cluster and set it's state as a candidate. We then tick it to see that the server state should change.  We then check to see that the state of the server is candidate.
-  2. Test Tie Braking: We create a cluster and insert 3 states (candidate, leader, follower). We then tick the time state and check to see that the server is demoted to follower.
-  3. Test Duplicate States: We create a cluster and insert 3 states (leader, leader, candidate). After a tick, we check to see that the server is demoted to candidate.
-  4. Test Multiple Calls: We create a cluster and first set states as leader, leader. Then after a tick we set the states as follower and candidate. We check to see that one server is the leader and after a tick it becomes a follower. 
-  5. Test Term Updates: We create a cluster and set a term as 3 and then as 2. We check to see that the term is 3, the max of the current term (1) and the other term we are trying to set (2).
-
-### Leader Election Tests
-The test suite for RAFT Leader Election is in test_raft.rb. The test tests the following case:
-  1. Test Single Leader Election: We create a cluster of 5 servers. We then wait for 5 seconds and check to see that a single leader is elected.
-  2. Test Leader Failure: If we kill the leader, then another one should be elected.
-  3. Test Killing Maximum Number of Servers: Start a cluster of 5 servers, then immediately kill 2 of them. A leader should still be elected.
-  4. Test Leader Election Tie: Have 2 nodes vote for each other. Make sure that there is only one leader.
-  5. Test Term Increments with Election: Record the term after election #1. Kill the leader so another election starts and check to see if the new term is greater than the old term.
+All unit and integration tests can be found and inspected in /test.
 
 References
 ----------
