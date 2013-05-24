@@ -6,7 +6,8 @@ Team: Noel Moldvai, Rohit Turumella, James Butkovic, and Josh Muhlfelder. For CS
 
 We believe leader election and log replication are working properly, but recovery has not been tested. We also have not implemented dynamic membership.
 
-## Running a Raft Server
+Running a Raft Server
+---------------------
 Before starting an instance of Raft, you must specify the group of servers that the system will be running on by passing them into the constructor. This is done via an array of addresses, like:  
 `['127.0.0.1:54321', '127.0.0.1:54322', '127.0.0.1:54323']`  
 Then, to run the code, something like this should be done:
@@ -22,6 +23,9 @@ The timeout can also be manually set using `set_timeout(min_timeout, is_random =
 
 The top-level `raft_server.rb` may be used to run a server, by passing in these arguments on the command line. The first argument is the port on which to run locally and the rest are all members of the cluster.
 
+### Communicating with a Server via Client
+A server is meant to be communicated with so that commands can be issued and responses obtained from a state machine.
+
 Components
 ----------
 The large ideas behind Raft are implemented in src/raft.rb. The basic flow is below, and differences are pointed out.
@@ -34,18 +38,21 @@ When a response is received, it is stored if the terms of both the sender and re
 In responding to VoteRequests, a server will only grant a vote if the terms are equal, the requester's log is at least as up to date as the voter's, and if the voter hadn't voted for anyone else in the current term. If the terms are not equal, the server with the lower term will step down and update theirs.
 
 ### Log Replication
-TODO
+A client makes a request to a Raft leader (or another server, in which case it replies with the address of the leader), and when the log for this request has been committed, the command is executed and returned.
+
+The leader issues requests to all servers to append a log entry, and if this is successful on a majority of servers, it can be marked as committed. Meanwhile, the leader is constantly updating other servers to get them up to date.
 
 Modules
 -------
 We have decomposed some elements of our implementation into modules that can stand alone and be tested in isolation.
 
 ### Server State
-The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, and an interface for snoozing the timer/having the alarm go off. Setting the term can only have the effect of increasing `current_term` or not affecting it at all.
+The state of the server is managed by the ServerState Module which implements the ServerStateProtocol interface. Server state includes the current state of the Raft server (either follower, candidate, or leader), the monotonically increasing current term, the leader, and an interface for snoozing the timer/having the alarm go off. Setting the term can only have the effect of increasing `current_term` or not affecting it at all.
 
 ```ruby
 interface :input, :set_state, [:state]
 interface :input, :set_term, [:term]
+interface :input, :set_leader, [:leader]
 interface :input, :reset_timer, [] => [:reset]
 interface :output, :alarm, [] => [:time_out]
 ```
@@ -54,6 +61,7 @@ The tables in ServerState should be "reached into" by the outer module to grab t
 ```ruby
 table :current_state, [] => [:state]
 table :current_term, [] => [:term]
+table :current_leader, [] => [:leader]
 ```
 
 ### Logger
@@ -67,6 +75,7 @@ interface :input, :remove_logs_after, [] => [:index]
 interface :input, :remove_uncommitted_logs, [] => [:ok]
 interface :output, :status, [] => [:last_index, :last_term, :last_committed]
 interface :output, :added_log_index, [] => [:index]
+interface :output, :committed_logs, [:index] => [:entry]
 ```
 
 The logs table can be reached into to inspect the logs.
@@ -95,6 +104,14 @@ The election timer is handled by the SnoozeTimer Module. The timer works by sett
 ```ruby
 interface :input, :set_alarm, [] => [:time_out]
 interface :output, :alarm, [] => [:time_out]
+```
+
+### State Machine
+The state machine simply takes input, does computation and spits output. This is a simple ordered state machine where commands are executed in order of index, and the function is simply the identity.
+
+```ruby
+interface :input, :execute, [:index] => [:command]
+interface :output, :result, [] => [:index, :result]
 ```
 
 Tests
