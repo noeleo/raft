@@ -110,8 +110,8 @@ module Raft
   end
 
   bloom :send_vote_requests do
-    vote_request <~ (heartbeat * members * st.current_state * st.current_term).combos do |h, m, s, t|
-      [m.host, ip_port, t.term, 0, 0] if s.state == 'candidate' and not election.voted.include?([t.term, m.host])
+    vote_request <~ (heartbeat * members * st.current_state * st.current_term * logger.status).combos do |h, m, s, t, l|
+      [m.host, ip_port, t.term, l.last_index, l.last_term] if s.state == 'candidate' and not election.voted.include?([t.term, m.host])
     end
   end
 
